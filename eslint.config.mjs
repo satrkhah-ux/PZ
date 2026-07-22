@@ -5,7 +5,8 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", ".netlify/**", "out/**", "build/**", "next-env.d.ts"]),
+  // supabase/functions is Deno code with its own runtime/rules — not part of the Next app.
+  globalIgnores([".next/**", ".netlify/**", "out/**", "build/**", "next-env.d.ts", "supabase/functions/**"]),
 ]);
 
 export default eslintConfig;
