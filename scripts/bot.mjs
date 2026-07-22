@@ -106,6 +106,7 @@ function mainMenu() {
     [{ text: "🧾 الطلبات الآن", callback_data: "now" }, { text: "🍽️ الطاولات", callback_data: "tables" }],
     [{ text: "🔥 الأكثر والأقل مبيعاً", callback_data: "top" }, { text: "📃 مبيعات كل منتج", callback_data: "counts" }],
     [{ text: "📋 المنتجات المتاحة", callback_data: "avail" }, { text: "⚙️ إدارة المنتجات", callback_data: "pcats" }],
+    [{ text: "🌙 التقرير اليومي النهائي", callback_data: "final" }],
   ];
 }
 
@@ -230,6 +231,48 @@ function kbItem(it) {
 const itemText = (it) =>
   [`⚙️ <b>${esc(it.name_ar)}</b>`, "", `💰 السعر: <b>${fmt(it.price)} د.ع</b>`, `🏷️ الكلفة: <b>${fmt(it.cost)} د.ع</b>`, `الحالة: ${it.is_active ? "مفعّل ✅" : "معطّل ⛔"}`].join("\n");
 
+// ── nightly report (23:59 Baghdad, sent to every owner) ────────────────────
+async function viewDailyFinal() {
+  const today = baghdadDay();
+  const rows = await summary(today, today);
+  const t = (Array.isArray(rows) ? rows : []).reduce(
+    (a, d) => ({ s: a.s + +d.sales, c: a.c + +d.orders_count, p: a.p + +d.profit, e: a.e + +d.expenses, n: a.n + +d.net }),
+    { s: 0, c: 0, p: 0, e: 0, n: 0 },
+  );
+  const sold = (await aggregateSold(today)).filter(([, q]) => q > 0);
+  const lines = [
+    `🌙 <b>التقرير اليومي النهائي — ${today}</b>`,
+    "",
+    `🧾 عدد الطلبات: <b>${t.c}</b>`,
+    `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
+    `📈 الأرباح: <b>${fmt(t.p)} د.ع</b>`,
+    `📉 المصروفات: <b>${fmt(t.e)} د.ع</b>`,
+    `✅ الصافي: <b>${fmt(t.n)} د.ع</b>`,
+    "",
+    `☕️ <b>الأصناف المباعة اليوم (${sold.reduce((s, [, q]) => s + q, 0)} قطعة):</b>`,
+  ];
+  if (sold.length === 0) lines.push("لا مبيعات اليوم.");
+  else sold.forEach(([n, q]) => lines.push(`• ${esc(n)} — <b>${q}</b>`));
+  return lines.join("\n").slice(0, 4000);
+}
+
+let lastReportDay = null;
+setInterval(async () => {
+  const bag = new Date(Date.now() + 3 * 3600e3); // Baghdad = UTC+3, no DST
+  const hhmm = bag.toISOString().slice(11, 16);
+  const day = bag.toISOString().slice(0, 10);
+  if (hhmm === "23:59" && lastReportDay !== day) {
+    lastReportDay = day;
+    try {
+      const text = await viewDailyFinal();
+      for (const o of OWNERS) await say(o, text, [BACK]);
+      console.log(`✓ nightly report sent for ${day}`);
+    } catch (e) {
+      console.error("nightly report error:", e.message);
+    }
+  }
+}, 30000);
+
 // ── conversational state (price/cost/add inputs) ───────────────────────────
 const pendingInput = new Map(); // chatId → {action, itemId?, categoryId?}
 
@@ -314,6 +357,7 @@ async function onCallback(cb) {
   if (cmd === "rpt") return say(chatId, await viewReport(Number(a)), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
   if (cmd === "now") return say(chatId, await viewNow(), [[{ text: "🔄 تحديث", callback_data: "now" }], BACK], mid);
   if (cmd === "tables") return say(chatId, await viewTables(), [[{ text: "🔄 تحديث", callback_data: "tables" }], BACK], mid);
+  if (cmd === "final") return say(chatId, await viewDailyFinal(), [[{ text: "🔄 تحديث", callback_data: "final" }], BACK], mid);
   if (cmd === "top") return say(chatId, await viewTop(), [BACK], mid);
   if (cmd === "counts") return say(chatId, await viewCounts(), [BACK], mid);
   if (cmd === "avail") return say(chatId, await viewAvail(), [BACK], mid);

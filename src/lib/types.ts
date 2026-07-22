@@ -23,9 +23,18 @@ export type Database = {
         Relationships: [];
       };
       employees: {
-        Row: Timestamped & { name_ar: string; role_id: string | null; auth_user_id: string | null; is_active: boolean };
-        Insert: { id?: string; name_ar: string; role_id?: string | null; auth_user_id?: string | null; is_active?: boolean; created_at?: string };
-        Update: Partial<{ name_ar: string; role_id: string | null; auth_user_id: string | null; is_active: boolean }>;
+        Row: Timestamped & {
+          name_ar: string; role_id: string | null; auth_user_id: string | null; is_active: boolean;
+          wage_amount: number; wage_period: "daily" | "weekly" | "monthly" | null;
+        };
+        Insert: {
+          id?: string; name_ar: string; role_id?: string | null; auth_user_id?: string | null; is_active?: boolean;
+          wage_amount?: number; wage_period?: "daily" | "weekly" | "monthly" | null; created_at?: string;
+        };
+        Update: Partial<{
+          name_ar: string; role_id: string | null; auth_user_id: string | null; is_active: boolean;
+          wage_amount: number; wage_period: "daily" | "weekly" | "monthly" | null;
+        }>;
         Relationships: [];
       };
       categories: {
