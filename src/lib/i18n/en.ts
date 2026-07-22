@@ -12,7 +12,7 @@ export const en = {
   "nav.dashboard": "Dashboard",
 
   "auth.title": "Staff sign in",
-  "auth.email": "Email",
+  "auth.email": "Phone or username",
   "auth.password": "Password",
   "auth.signIn": "Sign in",
   "auth.signingIn": "Signing in…",

@@ -13,7 +13,7 @@ export const ar: Dictionary = {
   "nav.dashboard": "لوحة التحكم",
 
   "auth.title": "دخول الموظفين",
-  "auth.email": "البريد الإلكتروني",
+  "auth.email": "رقم الهاتف أو اسم المستخدم",
   "auth.password": "كلمة المرور",
   "auth.signIn": "تسجيل الدخول",
   "auth.signingIn": "جارٍ الدخول…",

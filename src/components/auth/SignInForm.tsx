@@ -27,7 +27,7 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
       cancelled = true;
     };
   }, [router, redirectTo]);
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +37,8 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
     setLoading(true);
     setError(null);
     try {
+      // phone numbers & usernames map to <login>@pizzara.iq auth accounts
+      const email = login.includes("@") ? login.trim() : `${login.trim()}@pizzara.iq`;
       const supabase = createSupabaseBrowserClient();
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
@@ -65,11 +67,12 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
       <label className="block space-y-1">
         <span className="text-sm font-medium">{t("auth.email")}</span>
         <input
-          type="email"
+          type="text"
           required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username"
+          placeholder="07XXXXXXXXX"
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
           className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
           dir="ltr"
         />
