@@ -33,6 +33,7 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
     p_channel: input.channel,
     p_lines: input.lines as unknown as Json,
     p_customer: null,
+    p_table: input.table?.trim() || null,
   });
   if (error || !data?.[0]) return { ok: false, error: "تعذّر إرسال الطلب، حاول مجدداً." };
   return { ok: true, orderNumber: String(data[0].order_seq).padStart(3, "0") };
