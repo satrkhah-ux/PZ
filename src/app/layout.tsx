@@ -12,7 +12,7 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "بيزارا كافيه — Bizara Café",
+  title: "بيزارا كافيه — Pizzara",
   description: "منيو ونظام طلبات وولاء بيزارا كافيه.",
   manifest: "/manifest.webmanifest",
   // favicon comes from src/app/icon.png (Next serves it automatically)
