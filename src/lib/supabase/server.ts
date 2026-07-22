@@ -14,14 +14,21 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient<Datab
   const cookieStore = await cookies();
   const session = parseSessionCookie(cookieStore.get(AUTH_STORAGE_KEY)?.value);
 
+  // Never forward an EXPIRED access token: PostgREST would reject the whole
+  // request (401) and a stale-cookie visitor would see less than an anonymous
+  // one (e.g. an empty public menu). Fall back to anon; the browser client
+  // refreshes the token and later requests carry a fresh one.
+  const expired = session?.expiresAt != null && session.expiresAt * 1000 < Date.now();
+  const usable = session && !expired ? session : null;
+
   return createClient<Database>(url, anonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
     },
-    global: session
-      ? { headers: { Authorization: `Bearer ${session.accessToken}` } }
+    global: usable
+      ? { headers: { Authorization: `Bearer ${usable.accessToken}` } }
       : undefined,
   });
 }

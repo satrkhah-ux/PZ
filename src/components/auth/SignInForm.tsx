@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useCafeUI } from "@/components/CafeUIProvider";
@@ -8,6 +8,24 @@ import { useCafeUI } from "@/components/CafeUIProvider";
 export function SignInForm({ redirectTo }: { redirectTo: string }) {
   const { t } = useCafeUI();
   const router = useRouter();
+
+  // If the visitor landed here only because their access token expired, the
+  // browser client can silently refresh it from the refresh token — then send
+  // them straight back in instead of asking for the password again.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await createSupabaseBrowserClient().auth.getSession();
+        if (!cancelled && data.session) router.replace(redirectTo);
+      } catch {
+        /* demo mode or no session — stay on the form */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, redirectTo]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

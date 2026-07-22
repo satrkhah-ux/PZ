@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
@@ -27,6 +28,18 @@ export function StaffShell({
   const pathname = usePathname();
   const router = useRouter();
   const links = NAV.filter((n) => !n.adminOnly || role === "admin");
+
+  // Keep the session alive on staff screens: instantiating the browser client
+  // starts supabase-js's auto-refresh loop, which renews the access token and
+  // writes it back to the cookie the server reads. Without this, server reads
+  // silently degrade to anon an hour after login.
+  useEffect(() => {
+    try {
+      createSupabaseBrowserClient();
+    } catch {
+      /* demo mode: no supabase env */
+    }
+  }, []);
 
   async function signOut() {
     try {
