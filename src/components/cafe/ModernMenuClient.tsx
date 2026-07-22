@@ -32,10 +32,12 @@ export function ModernMenuClient({
   menu,
   table,
   demo,
+  preview = false,
 }: {
   menu: MenuCategoryView[];
   table?: string | null;
   demo: boolean;
+  preview?: boolean;
 }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const { lines, total, count, dispatch } = useCart();
@@ -76,6 +78,7 @@ export function ModernMenuClient({
                 <p className="text-xs text-[#f3e3cf]/60">
                   المنيو التفاعلي{table ? ` · طاولة ${table}` : ""}
                   {demo ? " · تجريبي" : ""}
+                  {preview ? " · 🧪 معاينة الصور الجديدة" : ""}
                 </p>
               </div>
             </div>

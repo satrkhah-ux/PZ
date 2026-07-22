@@ -25,7 +25,11 @@ function loadEnv() {
 }
 loadEnv();
 
-const SRC = process.argv[2] ?? "C:/Users/al3r1/Documents/Codex/2026-07-22/referenced-chatgpt-conversation-this-is-untrusted/outputs/PZ-All-Products";
+// --staging: upload to products-v2/ WITHOUT touching the live menu (preview at
+// /menu/modern?preview=v2). Approve later by re-running WITHOUT --staging.
+const args = process.argv.slice(2);
+const STAGING = args.includes("--staging");
+const SRC = args.find((a) => !a.startsWith("--")) ?? "C:/Users/al3r1/Documents/Codex/2026-07-22/referenced-chatgpt-conversation-this-is-untrusted/outputs/PZ-All-Products";
 
 // image number (01-36) → exact menu_items.name_ar
 const MAP = {
@@ -67,9 +71,14 @@ for (const [num, name] of Object.entries(MAP)) {
       img = img.extract({ left, top, width, height });
     }
     const webp = await img.resize(800, 1000, { fit: "cover" }).webp({ quality: 80 }).toBuffer();
-    const path = `products/${num}.webp`;
+    const path = `${STAGING ? "products-v2" : "products"}/${num}.webp`;
     const { error: upErr } = await supabase.storage.from("menu").upload(path, webp, { contentType: "image/webp", upsert: true });
     if (upErr) throw new Error(upErr.message);
+    if (STAGING) {
+      console.log(`✓ ${num} ${name} (staged)`);
+      ok++;
+      continue;
+    }
     const { data: pub } = supabase.storage.from("menu").getPublicUrl(path);
     // cache-bust so replaced images show immediately
     const url = `${pub.publicUrl}?v=${Date.now()}`;
