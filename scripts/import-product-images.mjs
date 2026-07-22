@@ -53,7 +53,20 @@ for (const [num, name] of Object.entries(MAP)) {
   if (!file) { console.log(`✗ ${num} ${name}: no file`); missing++; continue; }
 
   try {
-    const webp = await sharp(file).resize(900, 1125, { fit: "cover" }).webp({ quality: 80 }).toBuffer();
+    // The interim PZ-Product promo posters have the name/price baked into the top
+    // ~33% — crop it out (720×900 = clean 4:5 around the product). The designer's
+    // clean PZ-Item set has no text and is used as-is.
+    const isPromo = file.includes("PZ-Product-");
+    let img = sharp(file);
+    if (isPromo) {
+      const meta = await img.metadata();
+      const top = Math.round(meta.height * 0.335);
+      const height = meta.height - top;
+      const width = Math.min(meta.width, Math.round(height * 0.8));
+      const left = Math.round((meta.width - width) / 2);
+      img = img.extract({ left, top, width, height });
+    }
+    const webp = await img.resize(800, 1000, { fit: "cover" }).webp({ quality: 80 }).toBuffer();
     const path = `products/${num}.webp`;
     const { error: upErr } = await supabase.storage.from("menu").upload(path, webp, { contentType: "image/webp", upsert: true });
     if (upErr) throw new Error(upErr.message);

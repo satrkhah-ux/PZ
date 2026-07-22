@@ -282,13 +282,13 @@ function ModernCard({
           </>
         )}
 
-        {/* bottom scrim */}
-        <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+        {/* soft bottom fade into the card body */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#221409] to-transparent" />
       </div>
 
-      {/* info */}
-      <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-3">
-        <div className="flex items-end justify-between gap-2">
+      {/* info — fully BELOW the image so nothing covers the product */}
+      <div className="space-y-1.5 p-3">
+        <div className="flex items-start justify-between gap-2">
           <p className="font-bold leading-tight">{item.name_ar}</p>
           <p className="whitespace-nowrap text-sm font-extrabold text-[#d18b4a]">{formatIqdLabel(unitPrice)}</p>
         </div>
