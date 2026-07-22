@@ -157,6 +157,7 @@ export type Database = {
       create_card: { Args: { p_phone: string | null; p_name: string | null }; Returns: string };
       adjust_points: { Args: { p_customer: string; p_delta: number; p_reason: string; p_key?: string | null }; Returns: number };
       redeem_points: { Args: { p_customer: string; p_cost: number; p_key: string }; Returns: number };
+      get_orders_public: { Args: { p_orders: string[] }; Returns: Json };
       range_summary: {
         Args: { p_from: string; p_to: string };
         Returns: { day: string; sales: number; orders_count: number; profit: number; expenses: number; net: number }[];

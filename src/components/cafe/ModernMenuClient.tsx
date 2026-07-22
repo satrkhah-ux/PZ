@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Minus, Plus, ShoppingCart, X } from "lucide-react";
+import { Check, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
-import { submitOrder, type OrderLineInput } from "@/lib/cafe/order-actions";
+import { getMyOrders, submitOrder, type OrderLineInput, type PublicOrder } from "@/lib/cafe/order-actions";
 import { useCart, type CartLine } from "./use-cart";
 import { PizzaraMark } from "./Logo";
 
@@ -28,6 +28,36 @@ function imgSrcs(url: string | null) {
   const small = rel.replace(/\.webp(\?|$)/, "-sm.webp$1");
   return { src: small, srcSet: `${small} 400w, ${rel} 800w` };
 }
+
+/** ids of orders placed from THIS device today (the customer's own orders) */
+function loadMyOrderIds(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem("pz-my-orders") ?? "[]") as { id: string; day: string }[];
+    const today = new Date().toDateString();
+    return raw.filter((r) => r.day === today).map((r) => r.id);
+  } catch {
+    return [];
+  }
+}
+function saveMyOrderId(id: string) {
+  try {
+    const today = new Date().toDateString();
+    const raw = (JSON.parse(localStorage.getItem("pz-my-orders") ?? "[]") as { id: string; day: string }[]).filter(
+      (r) => r.day === today,
+    );
+    raw.push({ id, day: today });
+    localStorage.setItem("pz-my-orders", JSON.stringify(raw.slice(-20)));
+  } catch {
+    /* private mode */
+  }
+}
+
+const ORDER_STATUS_AR: Record<string, string> = {
+  pending: "🕐 قيد التجهيز",
+  paid: "✅ مكتمل",
+  cancelled: "✖ ملغي",
+  refunded: "↩ مسترجع",
+};
 
 const DROPS = [
   { left: "20%", top: "42%", delay: "0s", size: 5, dur: "4.2s" },
@@ -59,6 +89,29 @@ export function ModernMenuClient({
   const [custPhone, setCustPhone] = useState("");
   const [confirmed, setConfirmed] = useState<{ orderNumber: string; cardSerial: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+
+  // customer order tracking («طلباتي»)
+  const [myOrderIds, setMyOrderIds] = useState<string[]>([]);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [myOrders, setMyOrders] = useState<PublicOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of device storage
+    setMyOrderIds(loadMyOrderIds());
+  }, []);
+  async function refreshMyOrders(ids: string[]) {
+    setOrdersLoading(true);
+    try {
+      setMyOrders(await getMyOrders(ids));
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+  function openMyOrders() {
+    setConfirmed(null);
+    setOrdersOpen(true);
+    void refreshMyOrders(myOrderIds);
+  }
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -111,6 +164,10 @@ export function ModernMenuClient({
     dispatch({ type: "clear" });
     setCartOpen(false);
     setConfirmed({ orderNumber: res.orderNumber, cardSerial: res.cardSerial ?? null });
+    if (res.orderId) {
+      saveMyOrderId(res.orderId);
+      setMyOrderIds((ids) => [...ids, res.orderId!]);
+    }
   }
 
   return (
@@ -130,11 +187,22 @@ export function ModernMenuClient({
                 </p>
               </div>
             </div>
-            <div className="flex rounded-full border border-[#d18b4a]/40 p-0.5 text-xs font-semibold">
-              <span className="rounded-full bg-[#d18b4a] px-3 py-1 text-[#2b1a10]">مودرن</span>
-              <Link href={`/menu/classic${table ? `?t=${table}` : ""}`} className="rounded-full px-3 py-1 text-[#d18b4a] transition hover:bg-[#d18b4a]/10">
-                كلاسيكي
-              </Link>
+            <div className="flex items-center gap-1.5">
+              {myOrderIds.length > 0 && (
+                <button
+                  onClick={openMyOrders}
+                  className="flex items-center gap-1 rounded-full bg-[#d18b4a]/15 px-3 py-1.5 text-xs font-bold text-[#d18b4a] transition hover:bg-[#d18b4a]/25"
+                >
+                  <ReceiptText className="size-3.5" />
+                  طلباتي ({myOrderIds.length})
+                </button>
+              )}
+              <div className="flex rounded-full border border-[#d18b4a]/40 p-0.5 text-xs font-semibold">
+                <span className="rounded-full bg-[#d18b4a] px-3 py-1 text-[#2b1a10]">مودرن</span>
+                <Link href={`/menu/classic${table ? `?t=${table}` : ""}`} className="rounded-full px-3 py-1 text-[#d18b4a] transition hover:bg-[#d18b4a]/10">
+                  كلاسيكي
+                </Link>
+              </div>
             </div>
           </div>
           {/* categories */}
@@ -267,6 +335,73 @@ export function ModernMenuClient({
         </div>
       )}
 
+      {/* my orders — الزبون يراجع طلباته وأسعارها وحالتها ويضيف عليها */}
+      {ordersOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col justify-end bg-black/60" onClick={() => setOrdersOpen(false)}>
+          <div
+            className="mx-auto max-h-[85dvh] w-full max-w-5xl overflow-y-auto rounded-t-2xl border-t border-[#d18b4a]/30 bg-[#221409] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-lg font-bold text-[#d18b4a]">
+                <ReceiptText className="size-5" />
+                طلباتي
+              </h3>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => refreshMyOrders(myOrderIds)}
+                  aria-label="تحديث"
+                  className="rounded-full border border-[#d18b4a]/40 p-1.5 text-[#d18b4a] hover:bg-[#d18b4a]/10"
+                >
+                  <RefreshCw className={`size-4 ${ordersLoading ? "animate-spin" : ""}`} />
+                </button>
+                <button onClick={() => setOrdersOpen(false)} aria-label="إغلاق" className="rounded-full p-1.5 text-[#f3e3cf]/70 hover:bg-white/5">
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            {myOrders.length === 0 ? (
+              <p className="py-6 text-center text-sm text-[#f3e3cf]/60">{ordersLoading ? "جارٍ التحميل…" : "لا توجد طلبات بعد."}</p>
+            ) : (
+              <div className="space-y-3">
+                {myOrders.map((o) => (
+                  <div key={o.id} className="rounded-xl border border-[#d18b4a]/20 bg-black/25 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-[#d18b4a]">#{String(o.order_seq).padStart(3, "0")}</span>
+                      <span className="text-xs font-semibold">{ORDER_STATUS_AR[o.status] ?? o.status}</span>
+                    </div>
+                    {o.table_no && <p className="mt-0.5 text-xs text-[#f3e3cf]/60">طاولة {o.table_no}</p>}
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {o.items.map((it, i) => (
+                        <li key={i} className="flex justify-between gap-2">
+                          <span>
+                            {it.name_ar}
+                            {it.flavor_ar ? ` (${it.flavor_ar})` : ""} ×{it.qty}
+                          </span>
+                          <span className="text-[#f3e3cf]/70">{formatIqdLabel(it.line_total)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-2 flex justify-between border-t border-[#d18b4a]/15 pt-2 text-sm font-bold">
+                      <span>الإجمالي</span>
+                      <span className="text-[#d18b4a]">{formatIqdLabel(Math.max(0, o.subtotal - o.discount))}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={() => setOrdersOpen(false)}
+              className="mt-4 w-full rounded-xl bg-[#d18b4a] px-4 py-3 font-bold text-[#2b1a10] transition hover:opacity-90"
+            >
+              + أطلب المزيد
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* confirmation */}
       {confirmed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={() => setConfirmed(null)}>
@@ -287,9 +422,15 @@ export function ModernMenuClient({
                 🎁 بطاقة ولائك جاهزة — اضغط لفتحها واحفظها في هاتفك لتجمع النقاط
               </a>
             )}
-            <button onClick={() => setConfirmed(null)} className="mt-5 w-full rounded-xl border border-[#d18b4a]/40 px-4 py-2.5 font-semibold text-[#d18b4a] hover:bg-[#d18b4a]/10">
-              طلب جديد
-            </button>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button onClick={openMyOrders} className="flex items-center justify-center gap-1.5 rounded-xl bg-[#d18b4a] px-4 py-2.5 font-bold text-[#2b1a10] hover:opacity-90">
+                <ReceiptText className="size-4" />
+                متابعة طلبي
+              </button>
+              <button onClick={() => setConfirmed(null)} className="rounded-xl border border-[#d18b4a]/40 px-4 py-2.5 font-semibold text-[#d18b4a] hover:bg-[#d18b4a]/10">
+                طلب جديد
+              </button>
+            </div>
           </div>
         </div>
       )}

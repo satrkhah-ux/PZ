@@ -21,7 +21,7 @@ export type SubmitOrderInput = {
 };
 
 export type SubmitOrderResult =
-  | { ok: true; orderNumber: string; cardSerial?: string | null }
+  | { ok: true; orderNumber: string; orderId?: string | null; cardSerial?: string | null }
   | { ok: false; error: string };
 
 /** Place a self-order. Demo → a plausible number, no persistence. Real → place_order rpc.
@@ -59,5 +59,25 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
     p_table: input.table?.trim() || null,
   });
   if (error || !data?.[0]) return { ok: false, error: "تعذّر إرسال الطلب، حاول مجدداً." };
-  return { ok: true, orderNumber: String(data[0].order_seq).padStart(3, "0"), cardSerial };
+  return { ok: true, orderNumber: String(data[0].order_seq).padStart(3, "0"), orderId: data[0].order_id, cardSerial };
+}
+
+export type PublicOrderItem = { name_ar: string; flavor_ar: string | null; qty: number; unit_price: number; line_total: number };
+export type PublicOrder = {
+  id: string;
+  order_seq: number;
+  status: string;
+  table_no: string | null;
+  subtotal: number;
+  discount: number;
+  created_at: string;
+  items: PublicOrderItem[];
+};
+
+/** Customer-side order tracking — looks up their own orders by unguessable id. */
+export async function getMyOrders(ids: string[]): Promise<PublicOrder[]> {
+  if (!ids.length || isDemoServer()) return [];
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.rpc("get_orders_public", { p_orders: ids.slice(0, 20) });
+  return (Array.isArray(data) ? data : []) as PublicOrder[];
 }
