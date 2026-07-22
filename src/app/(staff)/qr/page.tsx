@@ -11,20 +11,23 @@ const TABLE_COUNT = 12;
 export default async function QrPage({
   searchParams,
 }: {
-  searchParams: Promise<{ base?: string }>;
+  searchParams: Promise<{ base?: string; path?: string }>;
 }) {
   const sp = await searchParams;
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const base = typeof sp.base === "string" && sp.base.startsWith("http") ? sp.base.replace(/\/$/, "") : `${proto}://${host}`;
+  // ?path=modern → interactive-menu stickers; default follows the site's purpose.
+  const modern = sp.path ? sp.path === "modern" : process.env.MODERN_ONLY === "1";
+  const menuPath = modern ? "/menu/modern" : "/menu";
 
   const opts = { margin: 1, color: { dark: "#42301f", light: "#ffffff" } };
-  const menuQr = await QRCode.toDataURL(`${base}/menu`, { ...opts, width: 380 });
+  const menuQr = await QRCode.toDataURL(`${base}${menuPath}`, { ...opts, width: 380 });
   const tables = await Promise.all(
     Array.from({ length: TABLE_COUNT }, (_, i) => i + 1).map(async (n) => ({
       n,
-      qr: await QRCode.toDataURL(`${base}/menu?t=${n}`, { ...opts, width: 300 }),
+      qr: await QRCode.toDataURL(`${base}${menuPath}?t=${n}`, { ...opts, width: 300 }),
     })),
   );
 
