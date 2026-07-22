@@ -91,7 +91,6 @@ export function StaffShell({
         /* demo mode or transient error */
       }
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state set after await
     tick();
     const t = setInterval(tick, 10000);
     return () => {
