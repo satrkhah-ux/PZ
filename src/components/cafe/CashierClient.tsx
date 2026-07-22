@@ -14,6 +14,7 @@ import {
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
+import { MenuIcon } from "./MenuIcon";
 
 type Line = {
   key: string;
@@ -187,7 +188,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {cat?.items.map((it) => (
-            <CashierItem key={it.id} item={it} onAdd={(line) => dispatch({ type: "add", line })} />
+            <CashierItem key={it.id} item={it} category={cat?.name_ar} onAdd={(line) => dispatch({ type: "add", line })} />
           ))}
         </div>
 
@@ -370,7 +371,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   );
 }
 
-function CashierItem({ item, onAdd }: { item: MenuItemView; onAdd: (line: Omit<Line, "qty">) => void }) {
+function CashierItem({ item, category, onAdd }: { item: MenuItemView; category?: string; onAdd: (line: Omit<Line, "qty">) => void }) {
   const [variantId, setVariantId] = useState<string | null>(item.variants[0]?.id ?? null);
   const [flavor, setFlavor] = useState<string | null>(item.flavors[0] ?? null);
   const variant = item.variants.find((v) => v.id === variantId) ?? null;
@@ -391,7 +392,10 @@ function CashierItem({ item, onAdd }: { item: MenuItemView; onAdd: (line: Omit<L
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card p-3">
       <button onClick={add} className="text-right">
-        <p className="font-semibold leading-tight">{item.name_ar}</p>
+        <div className="flex items-center gap-2">
+          <MenuIcon name={item.name_ar} category={category} className="size-8 shrink-0 text-primary/80" />
+          <p className="font-semibold leading-tight">{item.name_ar}</p>
+        </div>
         <p className="mt-0.5 text-sm font-bold text-primary">{formatIqdLabel(unitPrice)}</p>
       </button>
       {item.variants.length > 0 && (

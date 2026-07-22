@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import { getCardPublic } from "@/lib/cafe/loyalty-actions";
+import { PizzaraMark } from "@/components/cafe/Logo";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +32,12 @@ export default async function CardPage({ params }: { params: Promise<{ serial: s
   return (
     <main className="flex min-h-dvh items-center justify-center bg-gradient-to-b from-background to-secondary p-6">
       <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-border bg-card shadow-lg">
-        <div className="bg-primary px-6 py-5 text-primary-foreground">
-          <p className="text-sm opacity-80">بطاقة ولاء</p>
-          <h1 className="text-2xl font-extrabold">بيزارا كافيه</h1>
+        <div className="flex items-center justify-between bg-primary px-6 py-5 text-primary-foreground">
+          <div>
+            <p className="text-sm opacity-80">بطاقة ولاء</p>
+            <h1 className="text-2xl font-extrabold">بيزارا كافيه</h1>
+          </div>
+          <PizzaraMark className="size-14 shrink-0" />
         </div>
         <div className="space-y-4 p-6 text-center">
           {card.name_ar && <p className="text-lg font-semibold">{card.name_ar}</p>}

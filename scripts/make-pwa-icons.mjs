@@ -10,18 +10,21 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "public", "icons");
 mkdirSync(out, { recursive: true });
 
-// scale: cup group is drawn in a 512 box; maskable squeezes it into the 80% safe zone.
+// The Pizzara Coffee mark (matches src/components/cafe/Logo.tsx): dark espresso
+// disc, golden cup whose handle forms the "P", steam, saucer swoosh.
+// scale: maskable squeezes the artwork into the 80% safe zone.
 function brandSvg({ radius, scale }) {
   const s = scale;
   const t = (512 - 512 * s) / 2; // center the scaled group
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="${radius}" fill="#6f4e37"/>
-  <g transform="translate(${t} ${t}) scale(${s})">
-    <path d="M203 106c-14 20 14 34 0 54M256 94c-14 20 14 34 0 54M309 106c-14 20 14 34 0 54"
-          stroke="#f5e9dc" stroke-width="17" stroke-linecap="round" fill="none"/>
-    <path d="M148 206h216v86a78 78 0 0 1-78 78h-60a78 78 0 0 1-78-78z" fill="#f5e9dc"/>
-    <path d="M364 226h18a46 46 0 0 1 0 92h-18" stroke="#f5e9dc" stroke-width="19" fill="none"/>
-    <rect x="138" y="394" width="236" height="19" rx="9.5" fill="#f5e9dc"/>
+  <rect width="512" height="512" rx="${radius}" fill="#2b1a10"/>
+  <g transform="translate(${t} ${t}) scale(${s})" fill="none" stroke="#d18b4a" stroke-width="22" stroke-linecap="round">
+    <path d="M292 92c-26 30 16 46-8 78"/>
+    <path d="M336 106c-20 24 12 38-6 62"/>
+    <path d="M118 234h236c4 66-50 112-118 112s-120-46-118-112z" fill="#d18b4a" stroke="none"/>
+    <path d="M368 322V150" stroke-width="24"/>
+    <path d="M368 158h26a48 48 0 0 1 0 96h-26" stroke-width="24"/>
+    <path d="M96 372c52 34 262 32 322-16" stroke-width="20"/>
   </g>
 </svg>`);
 }

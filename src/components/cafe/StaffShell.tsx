@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/cafe/auth";
+import { PizzaraMark } from "./Logo";
 
 const NAV: { href: string; label: string; adminOnly: boolean }[] = [
   { href: "/dashboard", label: "لوحة التحكم", adminOnly: true },
@@ -55,7 +56,8 @@ export function StaffShell({
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href="/dashboard" className="whitespace-nowrap text-lg font-extrabold text-primary">
+            <Link href="/dashboard" className="flex shrink-0 items-center gap-2 whitespace-nowrap text-lg font-extrabold text-primary">
+              <PizzaraMark className="size-9" />
               بيزارا كافيه
             </Link>
             <nav className="flex gap-1 overflow-x-auto">

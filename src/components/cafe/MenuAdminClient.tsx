@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Coffee, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   addCategory,
   addVariant,
@@ -15,6 +15,7 @@ import {
   type AdminItem,
 } from "@/lib/cafe/menu-admin-actions";
 import { formatIqdLabel } from "@/lib/cafe/money";
+import { MenuIcon } from "./MenuIcon";
 
 type Editing = { item: AdminItem | null; categoryId: string };
 
@@ -107,8 +108,8 @@ export function MenuAdminClient({ categories }: { categories: AdminCategory[] })
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={it.image_url} alt="" className="size-10 rounded-lg object-cover" />
                         ) : (
-                          <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-primary/60">
-                            <Coffee className="size-5" />
+                          <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-primary/70">
+                            <MenuIcon name={it.name_ar} category={cat.name_ar} className="size-7" />
                           </span>
                         )}
                         <div>
@@ -292,8 +293,8 @@ function ItemForm({ editing, categories, onClose }: { editing: Editing; categori
               // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt="" className="size-16 rounded-lg border border-border object-cover" />
             ) : (
-              <span className="flex size-16 items-center justify-center rounded-lg bg-secondary text-primary/60">
-                <Coffee className="size-7" />
+              <span className="flex size-16 items-center justify-center rounded-lg bg-secondary text-primary/70">
+                <MenuIcon name={name || "صنف"} className="size-10" />
               </span>
             )}
             <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-secondary">

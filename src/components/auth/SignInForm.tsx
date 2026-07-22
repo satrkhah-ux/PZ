@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useCafeUI } from "@/components/CafeUIProvider";
+import { PizzaraMark } from "@/components/cafe/Logo";
 
 export function SignInForm({ redirectTo }: { redirectTo: string }) {
   const { t } = useCafeUI();
@@ -55,7 +56,8 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
       onSubmit={onSubmit}
       className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
     >
-      <div className="space-y-1 text-center">
+      <div className="space-y-2 text-center">
+        <PizzaraMark className="mx-auto size-20" />
         <h1 className="text-2xl font-bold text-primary">بيزارا كافيه</h1>
         <p className="text-sm text-muted-foreground">{t("auth.title")}</p>
       </div>

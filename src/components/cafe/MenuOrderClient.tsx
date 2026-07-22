@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useReducer, useState } from "react";
-import { Coffee, Minus, Plus, ShoppingCart, X, Check } from "lucide-react";
+import { Minus, Plus, ShoppingCart, X, Check } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
+import { MenuIcon } from "./MenuIcon";
+import { PizzaraMark } from "./Logo";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { submitOrder, type OrderLineInput } from "@/lib/cafe/order-actions";
 
@@ -93,12 +95,15 @@ export function MenuOrderClient({
       {/* header */}
       <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-extrabold text-primary">بيزارا كافيه</h1>
-            <p className="text-xs text-muted-foreground">
-              {channel === "kiosk" ? "الطلب من الجهاز اللوحي" : "المنيو الرقمي"}
-              {table ? ` · طاولة ${table}` : ""}
-            </p>
+          <div className="flex items-center gap-2.5">
+            <PizzaraMark className="size-11 shrink-0" />
+            <div>
+              <h1 className="text-xl font-extrabold text-primary">بيزارا كافيه</h1>
+              <p className="text-xs text-muted-foreground">
+                {channel === "kiosk" ? "الطلب من الجهاز اللوحي" : "المنيو الرقمي"}
+                {table ? ` · طاولة ${table}` : ""}
+              </p>
+            </div>
           </div>
           {demo && (
             <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground">
@@ -127,7 +132,7 @@ export function MenuOrderClient({
             <h2 className="text-lg font-bold text-foreground">{c.name_ar}</h2>
             <div className="grid gap-3">
               {c.items.map((it) => (
-                <ItemCard key={it.id} item={it} onAdd={(line) => dispatch({ type: "add", line })} />
+                <ItemCard key={it.id} item={it} category={c.name_ar} onAdd={(line) => dispatch({ type: "add", line })} />
               ))}
             </div>
           </section>
@@ -221,7 +226,7 @@ export function MenuOrderClient({
   );
 }
 
-function ItemCard({ item, onAdd }: { item: MenuItemView; onAdd: (line: Omit<Line, "qty">) => void }) {
+function ItemCard({ item, category, onAdd }: { item: MenuItemView; category?: string; onAdd: (line: Omit<Line, "qty">) => void }) {
   const [variantId, setVariantId] = useState<string | null>(item.variants[0]?.id ?? null);
   const [flavor, setFlavor] = useState<string | null>(item.flavors[0] ?? null);
 
@@ -236,12 +241,12 @@ function ItemCard({ item, onAdd }: { item: MenuItemView; onAdd: (line: Omit<Line
 
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card p-3">
-      <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary/70">
+      <div className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-secondary to-accent/25 text-primary">
         {item.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={item.image_url} alt={item.name_ar} className="size-full rounded-lg object-cover" loading="lazy" />
         ) : (
-          <Coffee className="size-7" />
+          <MenuIcon name={item.name_ar} category={category} className="size-10" />
         )}
       </div>
 
