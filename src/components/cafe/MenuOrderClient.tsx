@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useReducer, useState } from "react";
-import { Minus, Plus, ShoppingCart, X, Check } from "lucide-react";
+import Link from "next/link";
+import { Minus, Plus, ShoppingCart, X, Check, Sparkles } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { MenuIcon } from "./MenuIcon";
 import { PizzaraMark } from "./Logo";
@@ -105,11 +106,22 @@ export function MenuOrderClient({
               </p>
             </div>
           </div>
-          {demo && (
-            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground">
-              وضع تجريبي
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {demo && (
+              <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-accent-foreground">
+                وضع تجريبي
+              </span>
+            )}
+            {channel === "qr" && (
+              <Link
+                href={`/menu/modern${table ? `?t=${table}` : ""}`}
+                className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
+              >
+                <Sparkles className="size-3.5" />
+                المنيو التفاعلي
+              </Link>
+            )}
+          </div>
         </div>
         {/* category quick-nav */}
         <nav className="mt-3 -mb-1 flex gap-2 overflow-x-auto pb-1">

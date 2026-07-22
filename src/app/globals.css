@@ -107,6 +107,31 @@ body {
   color: var(--foreground);
 }
 
+/* ── Modern interactive menu (المنيو التفاعلي) animations ──────────────────
+   steam = hot drinks · drip/frost = iced drinks · float = pastries */
+@keyframes pz-steam {
+  0%   { opacity: 0; transform: translateY(16px) scaleX(1); }
+  25%  { opacity: 0.55; }
+  100% { opacity: 0; transform: translateY(-52px) translateX(7px) scaleX(1.8); }
+}
+@keyframes pz-drip {
+  0%   { opacity: 0; transform: translateY(-4px) scale(1); }
+  18%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(42px) scale(0.8); }
+}
+@keyframes pz-frost {
+  0%, 100% { opacity: 0.05; }
+  50%      { opacity: 0.28; }
+}
+@keyframes pz-card-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pz-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
 /* ── Thermal receipt printing (80mm) ───────────────────────────────────────
    Scoped with :has() so ONLY pages that render a receipt hijack printing —
    other pages (e.g. the QR-sticker sheet) print normally. */
