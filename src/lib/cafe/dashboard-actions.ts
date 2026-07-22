@@ -22,22 +22,39 @@ export async function getRangeSummary(from: string, to: string): Promise<DaySumm
   return (data ?? []) as DaySummary[];
 }
 
+export type RecentOrderItem = { name_ar: string; flavor_ar: string | null; qty: number; line_total: number };
 export type RecentOrder = {
   id: string;
   order_seq: number;
   channel: string;
   status: string;
   subtotal: number;
+  table_no: string | null;
   created_at: string;
+  items: RecentOrderItem[];
 };
 
-export async function getRecentOrders(limit = 12): Promise<RecentOrder[]> {
+/** Recent orders WITH their stored line items — every table order stays reviewable. */
+export async function getRecentOrders(limit = 15): Promise<RecentOrder[]> {
   await requireAdmin();
   const svc = createSupabaseServiceClient();
-  const { data } = await svc
+  const { data: orders } = await svc
     .from("orders")
-    .select("id, order_seq, channel, status, subtotal, created_at")
+    .select("id, order_seq, channel, status, subtotal, table_no, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data ?? []) as RecentOrder[];
+  if (!orders?.length) return [];
+
+  const ids = orders.map((o) => o.id);
+  const { data: items } = await svc
+    .from("order_items")
+    .select("order_id, name_ar, flavor_ar, qty, line_total")
+    .in("order_id", ids);
+  const byOrder = new Map<string, RecentOrderItem[]>();
+  for (const it of items ?? []) {
+    const arr = byOrder.get(it.order_id) ?? [];
+    arr.push({ name_ar: it.name_ar, flavor_ar: it.flavor_ar, qty: it.qty, line_total: it.line_total });
+    byOrder.set(it.order_id, arr);
+  }
+  return orders.map((o) => ({ ...o, items: byOrder.get(o.id) ?? [] })) as RecentOrder[];
 }

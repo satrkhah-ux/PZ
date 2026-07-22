@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import {
   Area,
@@ -31,6 +32,7 @@ export function DashboardClient({
   summary: DaySummary[];
   recent: RecentOrder[];
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const today = summary[summary.length - 1];
   const totals = summary.reduce(
     (t, d) => ({
@@ -131,6 +133,7 @@ export function DashboardClient({
                   <tr className="border-b border-border text-right text-muted-foreground">
                     <th className="px-4 py-2.5 font-medium">رقم</th>
                     <th className="px-4 py-2.5 font-medium">القناة</th>
+                    <th className="px-4 py-2.5 font-medium">الطاولة</th>
                     <th className="px-4 py-2.5 font-medium">الحالة</th>
                     <th className="px-4 py-2.5 font-medium">المبلغ</th>
                     <th className="px-4 py-2.5 font-medium">الوقت</th>
@@ -139,31 +142,56 @@ export function DashboardClient({
                 <tbody>
                   {recent.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                         لا توجد طلبات بعد.
                       </td>
                     </tr>
                   )}
                   {recent.map((o) => (
-                    <tr key={o.id} className="border-b border-border/60 last:border-0">
-                      <td className="px-4 py-2.5 font-semibold">{String(o.order_seq).padStart(3, "0")}</td>
-                      <td className="px-4 py-2.5">{CHANNEL_AR[o.channel] ?? o.channel}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[o.status] ?? ""}`}>
-                          {STATUS_AR[o.status] ?? o.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">{formatIqdLabel(o.subtotal)}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground" dir="ltr">
-                        {new Date(o.created_at).toLocaleString("en-GB", {
-                          timeZone: "Asia/Baghdad",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </td>
-                    </tr>
+                    <Fragment key={o.id}>
+                      <tr
+                        onClick={() => setExpandedId(expandedId === o.id ? null : o.id)}
+                        className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/40"
+                        title="اضغط لعرض تفاصيل الطلب"
+                      >
+                        <td className="px-4 py-2.5 font-semibold">{String(o.order_seq).padStart(3, "0")}</td>
+                        <td className="px-4 py-2.5">{CHANNEL_AR[o.channel] ?? o.channel}</td>
+                        <td className="px-4 py-2.5">{o.table_no ? `طاولة ${o.table_no}` : "—"}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_CLASS[o.status] ?? ""}`}>
+                            {STATUS_AR[o.status] ?? o.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">{formatIqdLabel(o.subtotal)}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground" dir="ltr">
+                          {new Date(o.created_at).toLocaleString("en-GB", {
+                            timeZone: "Asia/Baghdad",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </td>
+                      </tr>
+                      {expandedId === o.id && (
+                        <tr className="border-b border-border/60 bg-secondary/30">
+                          <td colSpan={6} className="px-6 py-3">
+                            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">تفاصيل الطلب:</p>
+                            <ul className="space-y-0.5 text-sm">
+                              {o.items.map((it, i) => (
+                                <li key={i} className="flex justify-between">
+                                  <span>
+                                    {it.name_ar}
+                                    {it.flavor_ar ? ` (${it.flavor_ar})` : ""} ×{it.qty}
+                                  </span>
+                                  <span className="text-muted-foreground">{formatIqdLabel(it.line_total)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

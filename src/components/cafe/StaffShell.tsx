@@ -1,12 +1,35 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { BellRing, LogOut } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/cafe/auth";
+import { listPendingOrders } from "@/lib/cafe/cashier-actions";
 import { PizzaraMark } from "./Logo";
+
+/** two-tone chime for a new incoming order (WebAudio — no asset needed) */
+function chime() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    [880, 1175].forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.18);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + i * 0.18 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.35);
+      o.start(ctx.currentTime + i * 0.18);
+      o.stop(ctx.currentTime + i * 0.18 + 0.4);
+    });
+  } catch {
+    /* audio blocked before first interaction — fine */
+  }
+}
 
 const NAV: { href: string; label: string; adminOnly: boolean }[] = [
   { href: "/dashboard", label: "لوحة التحكم", adminOnly: true },
@@ -43,6 +66,40 @@ export function StaffShell({
     }
   }, []);
 
+  // new-order alert on EVERY staff screen: poll pending self-orders, badge the
+  // cashier nav item, and chime + toast when a fresh table order lands.
+  const [pendingCount, setPendingCount] = useState(0);
+  const [toast, setToast] = useState<{ seq: number; table: string | null } | null>(null);
+  const knownIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    let stopped = false;
+    async function tick() {
+      try {
+        const orders = await listPendingOrders();
+        if (stopped) return;
+        setPendingCount(orders.length);
+        if (knownIds.current) {
+          const fresh = orders.find((o) => !knownIds.current!.has(o.id));
+          if (fresh) {
+            setToast({ seq: fresh.order_seq, table: fresh.table_no });
+            chime();
+            setTimeout(() => setToast(null), 9000);
+          }
+        }
+        knownIds.current = new Set(orders.map((o) => o.id));
+      } catch {
+        /* demo mode or transient error */
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state set after await
+    tick();
+    const t = setInterval(tick, 10000);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, []);
+
   async function signOut() {
     try {
       await createSupabaseBrowserClient().auth.signOut();
@@ -65,13 +122,18 @@ export function StaffShell({
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                     pathname.startsWith(l.href)
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground/80 hover:bg-secondary"
                   }`}
                 >
                   {l.label}
+                  {l.href === "/cashier" && pendingCount > 0 && (
+                    <span className="absolute -left-1 -top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               ))}
             </nav>
@@ -85,6 +147,22 @@ export function StaffShell({
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">{children}</main>
+
+      {/* new-order toast */}
+      {toast && (
+        <Link
+          href="/cashier"
+          onClick={() => setToast(null)}
+          className="fixed inset-x-4 top-16 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-4 py-3 text-primary-foreground shadow-xl print:hidden"
+        >
+          <BellRing className="size-6 shrink-0 animate-bounce" />
+          <span className="font-bold">
+            طلب جديد #{String(toast.seq).padStart(3, "0")}
+            {toast.table ? ` — طاولة ${toast.table}` : ""}
+          </span>
+          <span className="mr-auto text-xs opacity-80">اضغط للفتح</span>
+        </Link>
+      )}
     </div>
   );
 }

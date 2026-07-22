@@ -97,7 +97,7 @@ function mainMenu() {
     [{ text: "🧾 الطلبات الآن", callback_data: "now" }, { text: "🍽️ الطاولات", callback_data: "tables" }],
     [{ text: "🔥 الأكثر والأقل مبيعاً", callback_data: "top" }, { text: "📃 مبيعات كل منتج", callback_data: "counts" }],
     [{ text: "📋 المنتجات المتاحة", callback_data: "avail" }, { text: "⚙️ إدارة المنتجات", callback_data: "pcats" }],
-    [{ text: "🌙 التقرير اليومي النهائي", callback_data: "final" }],
+    [{ text: "🌙 التقرير اليومي النهائي", callback_data: "final" }, { text: "📉 إضافة مصروف", callback_data: "expadd" }],
   ];
 }
 
@@ -263,6 +263,25 @@ async function onMessage(msg: Row) {
       await say(chatId, `تم التحديث ✅\n\n${itemText(it)}`, kbItem(it));
       return;
     }
+    if (state.action === "expense") {
+      const parts = text.split(/\s+/);
+      const amount = Math.round(Number(parts[0].replace(/[^\d.]/g, "")));
+      const note = parts.slice(1).join(" ").trim();
+      if (!Number.isFinite(amount) || amount <= 0) {
+        await say(chatId, "الصيغة: <i>المبلغ ثم الوصف</i>\nمثال: <code>5000 مشتريات حليب</code>", [BACK]);
+        return;
+      }
+      const CATS = ["مشتريات", "رواتب", "إيجار", "كهرباء", "صيانة"];
+      const category = CATS.find((c) => note.includes(c)) ?? "أخرى";
+      await restWrite("expenses", "POST", { amount, note: note || null, category, business_day: baghdadDay() });
+      const t = sumRows(await summary(baghdadDay(), baghdadDay()));
+      await say(
+        chatId,
+        `تم تسجيل المصروف ✅\n💸 <b>${fmt(amount)} د.ع</b>${note ? ` — ${esc(note)}` : ""} (${category})\n\n📉 مصروفات اليوم: <b>${fmt(t.e)} د.ع</b>\n✅ صافي اليوم: <b>${fmt(t.n)} د.ع</b>`,
+        [[{ text: "📉 مصروف آخر", callback_data: "expadd" }], BACK],
+      );
+      return;
+    }
     if (state.action === "add") {
       const parts = text.split(/\s+/);
       const price = Math.round(Number(parts[parts.length - 1]));
@@ -295,6 +314,10 @@ async function onCallback(cb: Row) {
   if (cmd === "top") return say(chatId, await viewTop(), [BACK], mid);
   if (cmd === "counts") return say(chatId, await viewCounts(), [BACK], mid);
   if (cmd === "avail") return say(chatId, await viewAvail(), [BACK], mid);
+  if (cmd === "expadd") {
+    await setState(chatId, { action: "expense" });
+    return say(chatId, "💸 أرسل: <i>المبلغ ثم الوصف</i>\nمثال: <code>5000 مشتريات حليب</code>", [[{ text: "إلغاء", callback_data: "menu" }]], mid);
+  }
   if (cmd === "pcats") return say(chatId, "⚙️ <b>إدارة المنتجات</b> — اختر القسم:", await kbCategories(), mid);
   if (cmd === "pcat") return say(chatId, "اختر منتجاً لإدارته:", await kbItems(a), mid);
   if (cmd === "pitem") { const it = await oneItem(a); return say(chatId, itemText(it), kbItem(it), mid); }

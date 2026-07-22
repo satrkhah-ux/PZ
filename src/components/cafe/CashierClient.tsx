@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
@@ -70,6 +70,29 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [pending, setPending] = useState<PendingOrder[]>([]);
   const [queueErr, setQueueErr] = useState<string | null>(null);
 
+  // auto-print incoming self-orders (تذكرة مباشرة للطابعة). Persisted per device.
+  const [autoPrint, setAutoPrint] = useState(false);
+  const [tickets, setTickets] = useState<ReceiptData[]>([]);
+  const seenIds = useRef<Set<string> | null>(null);
+  const autoPrintRef = useRef(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a persisted device setting
+    setAutoPrint(localStorage.getItem("pz-autoprint") === "1");
+  }, []);
+  useEffect(() => {
+    autoPrintRef.current = autoPrint;
+    localStorage.setItem("pz-autoprint", autoPrint ? "1" : "0");
+  }, [autoPrint]);
+  // print the queued tickets one by one
+  useEffect(() => {
+    if (!tickets.length) return;
+    const t = setTimeout(() => {
+      window.print();
+      setTickets((q) => q.slice(1));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [tickets]);
+
   const lines = Object.values(cart);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const total = Math.max(0, subtotal - discount);
@@ -78,7 +101,28 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   // ponytail: 5s poll for incoming self-orders — swap to Supabase realtime if volume grows.
   const refreshPending = useCallback(async () => {
     try {
-      setPending(await listPendingOrders());
+      const orders = await listPendingOrders();
+      setPending(orders);
+      // auto-print any order we have not seen before (skip the very first load)
+      if (seenIds.current && autoPrintRef.current) {
+        const fresh = orders.filter((o) => !seenIds.current!.has(o.id));
+        if (fresh.length) {
+          setTickets((q) => [
+            ...q,
+            ...fresh.map((o) => ({
+              orderNumber: String(o.order_seq).padStart(3, "0"),
+              heading: "طلب جديد — غير مدفوع",
+              table: o.table_no,
+              lines: o.items.map((it) => ({ name: it.name_ar, flavor: it.flavor_ar, qty: it.qty, unitPrice: it.unit_price })),
+              subtotal: o.subtotal,
+              discount: 0,
+              total: o.subtotal,
+              dateTime: new Date().toLocaleString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }),
+            })),
+          ]);
+        }
+      }
+      seenIds.current = new Set(orders.map((o) => o.id));
     } catch {
       /* ignore transient errors */
     }
@@ -194,7 +238,13 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
 
         {/* incoming self-orders */}
         <section className="space-y-2 pt-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">الطلبات الواردة (موبايل/لوحي) — {pending.length}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-muted-foreground">الطلبات الواردة (موبايل/لوحي) — {pending.length}</h2>
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} className="accent-[#6f4e37]" />
+              🖨️ طباعة تلقائية للطلبات الواردة
+            </label>
+          </div>
           {queueErr && <p className="text-sm text-destructive">{queueErr}</p>}
           {pending.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">لا توجد طلبات معلّقة.</p>
@@ -365,8 +415,8 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         </div>
       )}
 
-      {/* print-only receipt */}
-      {receipt && <Receipt data={receipt} />}
+      {/* print-only: incoming-order ticket takes priority, else the checkout receipt */}
+      {tickets[0] ? <Receipt data={tickets[0]} /> : receipt && <Receipt data={receipt} />}
     </div>
   );
 }

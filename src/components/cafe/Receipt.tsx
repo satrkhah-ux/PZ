@@ -7,6 +7,10 @@ export type ReceiptData = {
   discount: number;
   total: number;
   dateTime: string;
+  /** table number for incoming self-order tickets */
+  table?: string | null;
+  /** ticket heading override (e.g. «طلب جديد — لم يُدفع») */
+  heading?: string;
 };
 
 /** 80mm thermal receipt. Hidden on screen; the only thing visible when printing
@@ -19,10 +23,16 @@ export function Receipt({ data }: { data: ReceiptData }) {
       <div style={{ textAlign: "center", fontWeight: 800, fontSize: "16px" }}>بيزارا كافيه</div>
       <div style={{ textAlign: "center", fontSize: "11px", marginBottom: "6px" }}>الرمادي — العراق</div>
       <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
+      {data.heading && (
+        <div style={{ textAlign: "center", fontWeight: 800, fontSize: "13px", margin: "2px 0" }}>{data.heading}</div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
         <span>رقم الطلب: {data.orderNumber}</span>
         <span>{data.dateTime}</span>
       </div>
+      {data.table && (
+        <div style={{ textAlign: "center", fontWeight: 800, fontSize: "15px", margin: "3px 0" }}>🍽 طاولة {data.table}</div>
+      )}
       <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
       <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
         <tbody>
