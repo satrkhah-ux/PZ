@@ -1,10 +1,11 @@
 import { getPublicMenu } from "@/lib/cafe/menu-data";
 import { isDemoServer } from "@/lib/cafe/demo";
-import { MenuOrderClient } from "@/components/cafe/MenuOrderClient";
+import { ModernMenuClient } from "@/components/cafe/ModernMenuClient";
 
 export const dynamic = "force-dynamic";
 
+/** المنيو اللوحي — نفس المودرن التفاعلي لكن بقناة kiosk للتقارير. */
 export default async function KioskPage() {
   const menu = await getPublicMenu();
-  return <MenuOrderClient menu={menu} channel="kiosk" demo={isDemoServer()} />;
+  return <ModernMenuClient menu={menu} channel="kiosk" demo={isDemoServer()} />;
 }

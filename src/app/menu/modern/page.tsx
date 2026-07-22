@@ -1,26 +1,18 @@
-import { getPublicMenu } from "@/lib/cafe/menu-data";
-import { isDemoServer } from "@/lib/cafe/demo";
-import { ModernMenuClient } from "@/components/cafe/ModernMenuClient";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function ModernMenuPage({
+/** المودرن أصبح المنيو الأساسي على /menu — نحافظ على الروابط القديمة المُشارَكة. */
+export default async function ModernMenuRedirect({
   searchParams,
 }: {
-  searchParams: Promise<{ t?: string; preview?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const preview = sp.preview === "v2";
-  let menu = await getPublicMenu();
-  if (preview) {
-    // preview the designer's staged set (products-v2/) without touching the live one
-    menu = menu.map((c) => ({
-      ...c,
-      items: c.items.map((it) => ({
-        ...it,
-        image_url: it.image_url?.replace("/products/", "/products-v2/") ?? null,
-      })),
-    }));
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === "string") qs.set(k, v);
   }
-  return <ModernMenuClient menu={menu} table={sp.t ?? null} demo={isDemoServer()} preview={preview} />;
+  const q = qs.toString();
+  redirect(q ? `/menu?${q}` : "/menu");
 }

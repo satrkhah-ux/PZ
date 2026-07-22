@@ -9,11 +9,11 @@ const isManagedHost =
 const nextConfig: NextConfig = {
   ...(isManagedHost ? {} : { output: "standalone" }),
   devIndicators: false,
-  // MODERN_ONLY=1 turns a deployment into a dedicated interactive-menu site:
-  // its root goes straight to /menu/modern (used by the second Netlify site).
+  // MODERN_ONLY=1 turns a deployment into a dedicated menu site: its root goes
+  // straight to the menu (the modern one — /menu is now the interactive default).
   async redirects() {
     return process.env.MODERN_ONLY === "1"
-      ? [{ source: "/", destination: "/menu/modern", permanent: false }]
+      ? [{ source: "/", destination: "/menu", permanent: false }]
       : [];
   },
 };

@@ -60,12 +60,15 @@ async function payOrder(
   discount: number,
   customerId: string | null,
 ): Promise<{ ok: true; total: number; awarded: number } | { ok: false; error: string }> {
-  const { data: ord } = await supabase.from("orders").select("subtotal").eq("id", orderId).maybeSingle();
+  const { data: ord } = await supabase.from("orders").select("subtotal, customer_id").eq("id", orderId).maybeSingle();
   const subtotal = ord?.subtotal ?? 0;
   const disc = Math.max(0, Math.round(discount));
   const net = Math.max(0, subtotal - disc);
   const cfg = loyaltyConfig();
-  const award = customerId ? earnPoints(net, cfg.pointsPerIqd) : 0;
+  // award points to whoever the order belongs to — the customer attached at the
+  // counter OR the one the self-order already carries (phone entered on the menu)
+  const beneficiary = customerId ?? ord?.customer_id ?? null;
+  const award = beneficiary ? earnPoints(net, cfg.pointsPerIqd) : 0;
   const { error } = await supabase.rpc("mark_order_paid", {
     p_order: orderId,
     p_discount: disc,

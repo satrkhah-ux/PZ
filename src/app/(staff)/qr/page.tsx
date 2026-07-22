@@ -18,9 +18,8 @@ export default async function QrPage({
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const base = typeof sp.base === "string" && sp.base.startsWith("http") ? sp.base.replace(/\/$/, "") : `${proto}://${host}`;
-  // ?path=modern → interactive-menu stickers; default follows the site's purpose.
-  const modern = sp.path ? sp.path === "modern" : process.env.MODERN_ONLY === "1";
-  const menuPath = modern ? "/menu/modern" : "/menu";
+  // المودرن هو الأساسي على /menu — ?path=classic لملصقات الكلاسيكي.
+  const menuPath = sp.path === "classic" ? "/menu/classic" : "/menu";
 
   const opts = { margin: 1, color: { dark: "#42301f", light: "#ffffff" } };
   const menuQr = await QRCode.toDataURL(`${base}${menuPath}`, { ...opts, width: 380 });

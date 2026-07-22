@@ -64,7 +64,9 @@ export function MenuOrderClient({
   const [cart, dispatch] = useReducer(cartReducer, {});
   const [cartOpen, setCartOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [custName, setCustName] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [confirmed, setConfirmed] = useState<{ orderNumber: string; cardSerial: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const lines = Object.values(cart);
@@ -80,7 +82,13 @@ export function MenuOrderClient({
       flavor: l.flavor,
       qty: l.qty,
     }));
-    const res = await submitOrder({ channel, table: table ?? null, lines: payload });
+    const res = await submitOrder({
+      channel,
+      table: table ?? null,
+      lines: payload,
+      name: custName.trim() || null,
+      phone: custPhone.trim() || null,
+    });
     setSubmitting(false);
     if (!res.ok) {
       setError(res.error);
@@ -88,7 +96,7 @@ export function MenuOrderClient({
     }
     dispatch({ type: "clear" });
     setCartOpen(false);
-    setConfirmed(res.orderNumber);
+    setConfirmed({ orderNumber: res.orderNumber, cardSerial: res.cardSerial ?? null });
   }
 
   return (
@@ -114,11 +122,11 @@ export function MenuOrderClient({
             )}
             {channel === "qr" && (
               <Link
-                href={`/menu/modern${table ? `?t=${table}` : ""}`}
+                href={`/menu${table ? `?t=${table}` : ""}`}
                 className="flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground transition hover:opacity-90"
               >
                 <Sparkles className="size-3.5" />
-                المنيو التفاعلي
+                المنيو المودرن
               </Link>
             )}
           </div>
@@ -200,6 +208,27 @@ export function MenuOrderClient({
               ))}
             </ul>
 
+            {/* customer capture (optional) */}
+            <div className="mt-4 space-y-2 rounded-xl bg-secondary/60 p-3">
+              <p className="text-xs font-semibold text-primary">🎁 أضف اسمك ورقمك (اختياري) — بطاقة ولاء ونقاط مع كل طلب</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={custName}
+                  onChange={(e) => setCustName(e.target.value)}
+                  placeholder="الاسم"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                <input
+                  value={custPhone}
+                  onChange={(e) => setCustPhone(e.target.value)}
+                  placeholder="07XXXXXXXXX"
+                  dir="ltr"
+                  inputMode="tel"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+
             {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
             <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
@@ -226,8 +255,17 @@ export function MenuOrderClient({
             </div>
             <h3 className="text-xl font-bold">تم استلام طلبك</h3>
             <p className="mt-1 text-muted-foreground">رقم الطلب</p>
-            <p className="my-2 text-4xl font-extrabold text-primary">{confirmed}</p>
+            <p className="my-2 text-4xl font-extrabold text-primary">{confirmed.orderNumber}</p>
             <p className="text-sm text-muted-foreground">اذكر الرقم عند الكاشير للدفع والاستلام.</p>
+            {confirmed.cardSerial && (
+              <a
+                href={`/card/${confirmed.cardSerial}`}
+                target="_blank"
+                className="mt-3 block rounded-xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary transition hover:bg-primary/20"
+              >
+                🎁 بطاقة ولائك جاهزة — اضغط لفتحها واحفظها في هاتفك
+              </a>
+            )}
             <button onClick={() => setConfirmed(null)} className="mt-5 w-full rounded-xl border border-border px-4 py-2.5 font-semibold hover:bg-secondary">
               طلب جديد
             </button>

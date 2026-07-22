@@ -33,17 +33,21 @@ export function ModernMenuClient({
   table,
   demo,
   preview = false,
+  channel = "qr",
 }: {
   menu: MenuCategoryView[];
   table?: string | null;
   demo: boolean;
   preview?: boolean;
+  channel?: "qr" | "kiosk";
 }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const { lines, total, count, dispatch } = useCart();
   const [cartOpen, setCartOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [custName, setCustName] = useState("");
+  const [custPhone, setCustPhone] = useState("");
+  const [confirmed, setConfirmed] = useState<{ orderNumber: string; cardSerial: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
@@ -54,7 +58,13 @@ export function ModernMenuClient({
     setBusy(true);
     setErr(null);
     const payload: OrderLineInput[] = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-    const res = await submitOrder({ channel: "qr", table: table ?? null, lines: payload });
+    const res = await submitOrder({
+      channel,
+      table: table ?? null,
+      lines: payload,
+      name: custName.trim() || null,
+      phone: custPhone.trim() || null,
+    });
     setBusy(false);
     if (!res.ok) {
       setErr(res.error);
@@ -62,7 +72,7 @@ export function ModernMenuClient({
     }
     dispatch({ type: "clear" });
     setCartOpen(false);
-    setConfirmed(res.orderNumber);
+    setConfirmed({ orderNumber: res.orderNumber, cardSerial: res.cardSerial ?? null });
   }
 
   return (
@@ -82,12 +92,12 @@ export function ModernMenuClient({
                 </p>
               </div>
             </div>
-            <Link
-              href={`/menu${table ? `?t=${table}` : ""}`}
-              className="rounded-full border border-[#d18b4a]/40 px-3 py-1.5 text-xs font-semibold text-[#d18b4a] transition hover:bg-[#d18b4a]/10"
-            >
-              المنيو الكلاسيكي
-            </Link>
+            <div className="flex rounded-full border border-[#d18b4a]/40 p-0.5 text-xs font-semibold">
+              <span className="rounded-full bg-[#d18b4a] px-3 py-1 text-[#2b1a10]">مودرن</span>
+              <Link href={`/menu/classic${table ? `?t=${table}` : ""}`} className="rounded-full px-3 py-1 text-[#d18b4a] transition hover:bg-[#d18b4a]/10">
+                كلاسيكي
+              </Link>
+            </div>
           </div>
           {/* categories */}
           <nav className="mt-3 -mb-1 flex gap-2 overflow-x-auto pb-1">
@@ -162,6 +172,27 @@ export function ModernMenuClient({
                 </li>
               ))}
             </ul>
+            {/* customer capture (optional) — builds the loyalty base */}
+            <div className="mt-4 space-y-2 rounded-xl bg-black/25 p-3">
+              <p className="text-xs font-semibold text-[#d18b4a]">🎁 أضف اسمك ورقمك (اختياري) — تُنشأ لك بطاقة ولاء وتجمع نقاطاً مع كل طلب</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={custName}
+                  onChange={(e) => setCustName(e.target.value)}
+                  placeholder="الاسم"
+                  className="w-full rounded-lg border border-[#d18b4a]/30 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-[#f3e3cf]/40 focus:border-[#d18b4a]"
+                />
+                <input
+                  value={custPhone}
+                  onChange={(e) => setCustPhone(e.target.value)}
+                  placeholder="07XXXXXXXXX"
+                  dir="ltr"
+                  inputMode="tel"
+                  className="w-full rounded-lg border border-[#d18b4a]/30 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-[#f3e3cf]/40 focus:border-[#d18b4a]"
+                />
+              </div>
+            </div>
+
             {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
             <div className="mt-4 flex items-center justify-between border-t border-[#d18b4a]/20 pt-4">
               <span className="text-[#f3e3cf]/70">الإجمالي</span>
@@ -187,8 +218,17 @@ export function ModernMenuClient({
             </div>
             <h3 className="text-xl font-bold">تم استلام طلبك</h3>
             <p className="mt-1 text-[#f3e3cf]/60">رقم الطلب</p>
-            <p className="my-2 text-4xl font-extrabold text-[#d18b4a]">{confirmed}</p>
+            <p className="my-2 text-4xl font-extrabold text-[#d18b4a]">{confirmed.orderNumber}</p>
             <p className="text-sm text-[#f3e3cf]/60">اذكر الرقم عند الكاشير للدفع والاستلام.</p>
+            {confirmed.cardSerial && (
+              <a
+                href={`/card/${confirmed.cardSerial}`}
+                target="_blank"
+                className="mt-3 block rounded-xl bg-[#d18b4a]/15 px-4 py-3 text-sm font-semibold text-[#d18b4a] transition hover:bg-[#d18b4a]/25"
+              >
+                🎁 بطاقة ولائك جاهزة — اضغط لفتحها واحفظها في هاتفك لتجمع النقاط
+              </a>
+            )}
             <button onClick={() => setConfirmed(null)} className="mt-5 w-full rounded-xl border border-[#d18b4a]/40 px-4 py-2.5 font-semibold text-[#d18b4a] hover:bg-[#d18b4a]/10">
               طلب جديد
             </button>
