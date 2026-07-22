@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
       ? [{ source: "/", destination: "/menu", permanent: false }]
       : [];
   },
+  // /img/* → storage (same path the netlify.toml edge proxy serves in prod);
+  // this rewrite covers local dev and any Node host.
+  async rewrites() {
+    const supa = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    return supa
+      ? [{ source: "/img/:path*", destination: `${supa}/storage/v1/object/public/menu/:path*` }]
+      : [];
+  },
 };
 
 export default nextConfig;

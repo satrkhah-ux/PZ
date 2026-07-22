@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
@@ -17,6 +17,16 @@ function effectFor(categoryName: string): EffectKind {
   if (categoryName.includes("الساخنة")) return "hot";
   if (categoryName.includes("معجنات")) return "pastry";
   return "cold";
+}
+
+/** Serve product images through the site CDN (/img/* edge proxy) with a 400w
+ *  variant for phones/weak connections. */
+function imgSrcs(url: string | null) {
+  if (!url) return null;
+  const m = url.match(/\/storage\/v1\/object\/public\/menu\/(.+)$/);
+  const rel = m ? `/img/${m[1]}` : url;
+  const small = rel.replace(/\.webp(\?|$)/, "-sm.webp$1");
+  return { src: small, srcSet: `${small} 400w, ${rel} 800w` };
 }
 
 const DROPS = [
@@ -50,8 +60,36 @@ export function ModernMenuClient({
   const [confirmed, setConfirmed] = useState<{ orderNumber: string; cardSerial: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
-  const effect = cat ? effectFor(cat.name_ar) : "hot";
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const pillRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // scrollspy — highlight the category currently on screen (customers scroll
+  // through the whole menu; the pills follow along)
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            const c = e.target.getAttribute("data-cat");
+            if (c) setActiveCat(c);
+          }
+        }
+      },
+      { rootMargin: "-35% 0px -55% 0px" },
+    );
+    Object.values(sectionRefs.current).forEach((el) => el && obs.observe(el));
+    return () => obs.disconnect();
+  }, [menu]);
+
+  // keep the active pill visible inside the scrollable bar
+  useEffect(() => {
+    pillRefs.current[activeCat]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [activeCat]);
+
+  function goTo(c: string) {
+    setActiveCat(c);
+    sectionRefs.current[c]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function onSubmit() {
     if (!lines.length || busy) return;
@@ -104,9 +142,12 @@ export function ModernMenuClient({
             {menu.map((c) => (
               <button
                 key={c.name_ar}
-                onClick={() => setActiveCat(c.name_ar)}
+                ref={(el) => {
+                  pillRefs.current[c.name_ar] = el;
+                }}
+                onClick={() => goTo(c.name_ar)}
                 className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                  c.name_ar === cat?.name_ar
+                  c.name_ar === activeCat
                     ? "bg-[#d18b4a] text-[#2b1a10]"
                     : "border border-[#d18b4a]/30 text-[#f3e3cf]/80 hover:bg-[#d18b4a]/10"
                 }`}
@@ -117,11 +158,28 @@ export function ModernMenuClient({
           </nav>
         </header>
 
-        {/* cards */}
-        <main key={cat?.name_ar} className="grid grid-cols-2 gap-4 px-4 py-5 pb-32 lg:grid-cols-3">
-          {cat?.items.map((it, i) => (
-            <ModernCard key={it.id} item={it} effect={effect} index={i} onAdd={(line) => dispatch({ type: "add", line })} />
-          ))}
+        {/* one continuous scroll through every category */}
+        <main className="space-y-8 px-4 py-5 pb-32">
+          {menu.map((c) => {
+            const effect = effectFor(c.name_ar);
+            return (
+              <section
+                key={c.name_ar}
+                data-cat={c.name_ar}
+                ref={(el) => {
+                  sectionRefs.current[c.name_ar] = el;
+                }}
+                className="scroll-mt-36"
+              >
+                <h2 className="mb-3 text-lg font-bold text-[#d18b4a]">{c.name_ar}</h2>
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                  {c.items.map((it, i) => (
+                    <ModernCard key={it.id} item={it} effect={effect} index={i % 8} onAdd={(line) => dispatch({ type: "add", line })} />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </main>
       </div>
 
@@ -254,6 +312,7 @@ function ModernCard({
   const [flavor, setFlavor] = useState<string | null>(item.flavors[0] ?? null);
   const variant = item.variants.find((v) => v.id === variantId) ?? null;
   const unitPrice = variant?.price ?? item.price;
+  const srcs = imgSrcs(item.image_url);
 
   function add() {
     onAdd({
@@ -273,9 +332,19 @@ function ModernCard({
     >
       {/* image */}
       <div className="relative aspect-[4/5]" style={effect === "pastry" ? { animation: "pz-float 4s ease-in-out infinite" } : undefined}>
-        {item.image_url ? (
+        {srcs ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.image_url} alt={item.name_ar} className="absolute inset-0 size-full object-cover" loading="lazy" />
+          <img
+            src={srcs.src}
+            srcSet={srcs.srcSet}
+            sizes="(min-width: 1024px) 30vw, 50vw"
+            width={800}
+            height={1000}
+            alt={item.name_ar}
+            className="absolute inset-0 size-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-b from-[#2b1a10] to-[#180f09]" />
         )}

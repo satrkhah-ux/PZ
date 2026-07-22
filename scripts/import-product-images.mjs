@@ -70,10 +70,17 @@ for (const [num, name] of Object.entries(MAP)) {
       const left = Math.round((meta.width - width) / 2);
       img = img.extract({ left, top, width, height });
     }
-    const webp = await img.resize(800, 1000, { fit: "cover" }).webp({ quality: 80 }).toBuffer();
-    const path = `${STAGING ? "products-v2" : "products"}/${num}.webp`;
+    // two sizes: 800w main + 400w for phones/weak connections (srcset)
+    const [webp, webpSm] = await Promise.all([
+      img.clone().resize(800, 1000, { fit: "cover" }).webp({ quality: 80 }).toBuffer(),
+      img.clone().resize(400, 500, { fit: "cover" }).webp({ quality: 70 }).toBuffer(),
+    ]);
+    const prefix = STAGING ? "products-v2" : "products";
+    const path = `${prefix}/${num}.webp`;
     const { error: upErr } = await supabase.storage.from("menu").upload(path, webp, { contentType: "image/webp", upsert: true });
     if (upErr) throw new Error(upErr.message);
+    const { error: upSmErr } = await supabase.storage.from("menu").upload(`${prefix}/${num}-sm.webp`, webpSm, { contentType: "image/webp", upsert: true });
+    if (upSmErr) throw new Error(upSmErr.message);
     if (STAGING) {
       console.log(`✓ ${num} ${name} (staged)`);
       ok++;
