@@ -1,0 +1,436 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
+import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
+import { formatIqdLabel } from "@/lib/cafe/money";
+import {
+  cashierCheckout,
+  listPendingOrders,
+  payPendingOrder,
+  cancelOrder,
+  type PendingOrder,
+} from "@/lib/cafe/cashier-actions";
+import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
+import { QrScanner } from "./QrScanner";
+import { Receipt, type ReceiptData } from "./Receipt";
+
+type Line = {
+  key: string;
+  itemId: string;
+  name: string;
+  variantId: string | null;
+  flavor: string | null;
+  unitPrice: number;
+  qty: number;
+};
+type Cart = Record<string, Line>;
+type CartAction = { type: "add"; line: Omit<Line, "qty"> } | { type: "inc"; key: string } | { type: "dec"; key: string } | { type: "clear" };
+
+function cartReducer(state: Cart, action: CartAction): Cart {
+  switch (action.type) {
+    case "add": {
+      const ex = state[action.line.key];
+      return { ...state, [action.line.key]: { ...action.line, qty: (ex?.qty ?? 0) + 1 } };
+    }
+    case "inc": {
+      const l = state[action.key];
+      return l ? { ...state, [action.key]: { ...l, qty: l.qty + 1 } } : state;
+    }
+    case "dec": {
+      const l = state[action.key];
+      if (!l) return state;
+      if (l.qty <= 1) {
+        const n = { ...state };
+        delete n[action.key];
+        return n;
+      }
+      return { ...state, [action.key]: { ...l, qty: l.qty - 1 } };
+    }
+    case "clear":
+      return {};
+  }
+}
+
+const CHANNEL_AR: Record<string, string> = { qr: "موبايل", kiosk: "لوحي", cashier: "كاشير" };
+
+export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
+  const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
+  const [cart, dispatch] = useReducer(cartReducer, {});
+  const [discount, setDiscount] = useState(0);
+  const [customer, setCustomer] = useState<Card | null>(null);
+  const [serialInput, setSerialInput] = useState("");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [loyaltyMsg, setLoyaltyMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
+  const [pending, setPending] = useState<PendingOrder[]>([]);
+  const [queueErr, setQueueErr] = useState<string | null>(null);
+
+  const lines = Object.values(cart);
+  const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
+  const total = Math.max(0, subtotal - discount);
+  const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
+
+  // ponytail: 5s poll for incoming self-orders — swap to Supabase realtime if volume grows.
+  const refreshPending = useCallback(async () => {
+    try {
+      setPending(await listPendingOrders());
+    } catch {
+      /* ignore transient errors */
+    }
+  }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state is set after an await
+    refreshPending();
+    const t = setInterval(refreshPending, 5000);
+    return () => clearInterval(t);
+  }, [refreshPending]);
+
+  async function lookup(serial: string) {
+    const s = serial.trim();
+    if (!s) return;
+    setLoyaltyMsg(null);
+    const card = await findCard(s);
+    if (!card) {
+      setLoyaltyMsg("بطاقة غير موجودة.");
+      return;
+    }
+    setCustomer(card);
+  }
+
+  const onScanned = useCallback((text: string) => {
+    setScanOpen(false);
+    void lookup(text);
+  }, []);
+
+  async function redeem() {
+    if (!customer) return;
+    setLoyaltyMsg(null);
+    const res = await redeemReward(customer.id, total);
+    if (!res.ok) {
+      setLoyaltyMsg(res.error);
+      return;
+    }
+    // ponytail: redeem deducts points immediately, before payment — a cancelled
+    // checkout needs a manual adjust-back. Acceptable v1.
+    setDiscount((d) => d + res.discount);
+    setCustomer({ ...customer, points: res.balance });
+    setLoyaltyMsg(`تم استبدال مكافأة — خصم ${formatIqdLabel(res.discount)}`);
+  }
+
+  async function checkout() {
+    if (!lines.length || busy) return;
+    setBusy(true);
+    setErr(null);
+    const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
+    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null });
+    setBusy(false);
+    if (!res.ok) {
+      setErr(res.error);
+      return;
+    }
+    setReceipt({
+      orderNumber: res.orderNumber,
+      lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
+      subtotal,
+      discount,
+      total,
+      dateTime: new Date().toLocaleString("en-GB", {
+        timeZone: "Asia/Baghdad",
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+    });
+    setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });
+    dispatch({ type: "clear" });
+    setCustomer(null);
+    setDiscount(0);
+    setSerialInput("");
+    void refreshPending();
+  }
+
+  async function acceptPending(id: string) {
+    setQueueErr(null);
+    const res = await payPendingOrder(id);
+    if (!res.ok) setQueueErr(res.error);
+    void refreshPending();
+  }
+  async function rejectPending(id: string) {
+    setQueueErr(null);
+    const res = await cancelOrder(id);
+    if (!res.ok) setQueueErr(res.error);
+    void refreshPending();
+  }
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      {/* items */}
+      <section className="space-y-4">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {menu.map((c) => (
+            <button
+              key={c.name_ar}
+              onClick={() => setActiveCat(c.name_ar)}
+              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                c.name_ar === (cat?.name_ar ?? "") ? "bg-primary text-primary-foreground" : "border border-border hover:bg-secondary"
+              }`}
+            >
+              {c.name_ar}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          {cat?.items.map((it) => (
+            <CashierItem key={it.id} item={it} onAdd={(line) => dispatch({ type: "add", line })} />
+          ))}
+        </div>
+
+        {/* incoming self-orders */}
+        <section className="space-y-2 pt-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">الطلبات الواردة (موبايل/لوحي) — {pending.length}</h2>
+          {queueErr && <p className="text-sm text-destructive">{queueErr}</p>}
+          {pending.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">لا توجد طلبات معلّقة.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {pending.map((o) => (
+                <div key={o.id} className="rounded-xl border border-border bg-card p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold">#{String(o.order_seq).padStart(3, "0")}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {CHANNEL_AR[o.channel] ?? o.channel}
+                      {o.table_no ? ` · طاولة ${o.table_no}` : ""}
+                    </span>
+                  </div>
+                  <ul className="my-2 space-y-0.5 text-sm text-muted-foreground">
+                    {o.items.map((it, i) => (
+                      <li key={i}>
+                        {it.name_ar}
+                        {it.flavor_ar ? ` (${it.flavor_ar})` : ""} ×{it.qty}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold">{formatIqdLabel(o.subtotal)}</span>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => acceptPending(o.id)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
+                        تأكيد الدفع
+                      </button>
+                      <button onClick={() => rejectPending(o.id)} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-secondary">
+                        إلغاء
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+
+      {/* order panel */}
+      <aside className="h-fit space-y-4 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-20">
+        <h2 className="text-lg font-bold">الطلب الحالي</h2>
+
+        {lines.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+            اختر الأصناف من القائمة.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {lines.map((l) => (
+              <li key={l.key} className="flex items-center justify-between gap-2 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{l.name}</p>
+                  {l.flavor && <p className="text-xs text-muted-foreground">{l.flavor}</p>}
+                  <p className="text-xs text-muted-foreground">{formatIqdLabel(l.unitPrice)}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => dispatch({ type: "dec", key: l.key })} aria-label="إنقاص" className="rounded-full border border-border p-1 hover:bg-secondary">
+                    <Minus className="size-3.5" />
+                  </button>
+                  <span className="w-5 text-center text-sm font-semibold">{l.qty}</span>
+                  <button onClick={() => dispatch({ type: "inc", key: l.key })} aria-label="زيادة" className="rounded-full border border-border p-1 hover:bg-secondary">
+                    <Plus className="size-3.5" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* loyalty */}
+        <div className="space-y-2 rounded-xl bg-secondary/60 p-3">
+          <p className="text-sm font-semibold">بطاقة الولاء</p>
+          {customer ? (
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <div>
+                <p className="font-medium">{customer.name_ar ?? "زبون"}</p>
+                <p className="text-xs text-muted-foreground">الرصيد: {customer.points} نقطة</p>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={redeem} className="rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-foreground hover:opacity-90">
+                  استبدال مكافأة
+                </button>
+                <button onClick={() => setCustomer(null)} aria-label="إزالة" className="rounded-lg border border-border p-1.5 hover:bg-background">
+                  <Trash2 className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-1.5">
+              <input
+                value={serialInput}
+                onChange={(e) => setSerialInput(e.target.value)}
+                placeholder="رقم البطاقة"
+                dir="ltr"
+                className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button onClick={() => lookup(serialInput)} className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-background">
+                بحث
+              </button>
+              <button onClick={() => setScanOpen(true)} aria-label="مسح QR" className="rounded-lg bg-primary p-2 text-primary-foreground hover:opacity-90">
+                <QrCode className="size-4" />
+              </button>
+            </div>
+          )}
+          {loyaltyMsg && <p className="text-xs text-muted-foreground">{loyaltyMsg}</p>}
+        </div>
+
+        {/* totals */}
+        <div className="space-y-1.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">المجموع</span>
+            <span>{formatIqdLabel(subtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">الخصم</span>
+            <input
+              type="number"
+              min={0}
+              value={discount || ""}
+              onChange={(e) => setDiscount(Math.max(0, Math.round(Number(e.target.value) || 0)))}
+              className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-left text-sm outline-none focus:ring-2 focus:ring-ring"
+              dir="ltr"
+            />
+          </div>
+          <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
+            <span>الإجمالي</span>
+            <span>{formatIqdLabel(total)}</span>
+          </div>
+        </div>
+
+        {err && <p className="text-sm text-destructive">{err}</p>}
+
+        <button
+          onClick={checkout}
+          disabled={busy || lines.length === 0}
+          className="w-full rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? "جارٍ التنفيذ…" : "دفع نقدي وإصدار الطلب"}
+        </button>
+      </aside>
+
+      {/* scanner */}
+      {scanOpen && <QrScanner onScan={onScanned} onClose={() => setScanOpen(false)} />}
+
+      {/* success */}
+      {success && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6" onClick={() => setSuccess(null)}>
+          <div className="w-full max-w-sm rounded-2xl bg-card p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Check className="size-8" />
+            </div>
+            <h3 className="text-xl font-bold">تم الدفع</h3>
+            <p className="mt-1 text-muted-foreground">رقم الطلب</p>
+            <p className="my-2 text-4xl font-extrabold text-primary">{success.orderNumber}</p>
+            {success.awarded > 0 && <p className="text-sm text-muted-foreground">أُضيفت {success.awarded} نقطة ولاء.</p>}
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button onClick={() => window.print()} className="flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90">
+                <Printer className="size-4" />
+                طباعة
+              </button>
+              <button onClick={() => setSuccess(null)} className="rounded-xl border border-border px-4 py-2.5 font-semibold hover:bg-secondary">
+                طلب جديد
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* print-only receipt */}
+      {receipt && <Receipt data={receipt} />}
+    </div>
+  );
+}
+
+function CashierItem({ item, onAdd }: { item: MenuItemView; onAdd: (line: Omit<Line, "qty">) => void }) {
+  const [variantId, setVariantId] = useState<string | null>(item.variants[0]?.id ?? null);
+  const [flavor, setFlavor] = useState<string | null>(item.flavors[0] ?? null);
+  const variant = item.variants.find((v) => v.id === variantId) ?? null;
+  const unitPrice = variant?.price ?? item.price;
+  const displayName = variant ? `${item.name_ar} - ${variant.name_ar}` : item.name_ar;
+
+  function add() {
+    onAdd({
+      key: `${item.id}|${variantId ?? ""}|${flavor ?? ""}`,
+      itemId: item.id,
+      name: displayName,
+      variantId,
+      flavor,
+      unitPrice,
+    });
+  }
+
+  return (
+    <div className="flex flex-col rounded-xl border border-border bg-card p-3">
+      <button onClick={add} className="text-right">
+        <p className="font-semibold leading-tight">{item.name_ar}</p>
+        <p className="mt-0.5 text-sm font-bold text-primary">{formatIqdLabel(unitPrice)}</p>
+      </button>
+      {item.variants.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {item.variants.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setVariantId(v.id)}
+              className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                v.id === variantId ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-secondary"
+              }`}
+            >
+              {v.name_ar}
+            </button>
+          ))}
+        </div>
+      )}
+      {item.flavors.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {item.flavors.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFlavor(f)}
+              className={`rounded-full border px-2 py-0.5 text-[11px] transition ${
+                f === flavor ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-secondary"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={add}
+        className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-primary/10 px-2 py-1.5 text-sm font-semibold text-primary transition hover:bg-primary hover:text-primary-foreground"
+      >
+        <Plus className="size-4" />
+        إضافة
+      </button>
+    </div>
+  );
+}

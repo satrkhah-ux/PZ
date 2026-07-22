@@ -1,0 +1,13 @@
+# Netlify deploy config — Next.js 16 via the official runtime.
+# Set these environment variables in the Netlify site settings:
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#   SUPABASE_SERVICE_ROLE_KEY, POINTS_PER_IQD, POINTS_PER_REWARD, REWARD_VALUE_IQD
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

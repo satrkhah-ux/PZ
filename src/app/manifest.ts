@@ -1,0 +1,23 @@
+import type { MetadataRoute } from "next";
+
+// Installable PWA. Icons come from scripts/make-pwa-icons.mjs (placeholder brand
+// mark — regenerate when the owner supplies a real logo). The manifest must stay
+// public — src/proxy.ts's matcher excludes it from the auth gate.
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "بيزارا كافيه — Bizara Café",
+    short_name: "بيزارا كافيه",
+    description: "منيو وطلبات وولاء بيزارا كافيه",
+    start_url: "/menu",
+    display: "standalone",
+    dir: "rtl",
+    lang: "ar",
+    background_color: "#ffffff",
+    theme_color: "#6f4e37",
+    icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+  };
+}

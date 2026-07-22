@@ -1,0 +1,82 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useCafeUI } from "@/components/CafeUIProvider";
+
+export function SignInForm({ redirectTo }: { redirectTo: string }) {
+  const { t } = useCafeUI();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        setError(t("auth.error"));
+        return;
+      }
+      router.replace(redirectTo);
+    } catch {
+      setError(t("auth.error"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm"
+    >
+      <div className="space-y-1 text-center">
+        <h1 className="text-2xl font-bold text-primary">بيزارا كافيه</h1>
+        <p className="text-sm text-muted-foreground">{t("auth.title")}</p>
+      </div>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">{t("auth.email")}</span>
+        <input
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
+          dir="ltr"
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">{t("auth.password")}</span>
+        <input
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
+          dir="ltr"
+        />
+      </label>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+      >
+        {loading ? t("auth.signingIn") : t("auth.signIn")}
+      </button>
+    </form>
+  );
+}

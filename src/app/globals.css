@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Cafe palette (warm coffee tones) ──────────────────────────────────────
+   Light: cream background, espresso text, coffee-brown primary, caramel accent.
+   Replace these once the owner supplies brand colors (see plan open item #3). */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.985 0.008 85);
+  --foreground: oklch(0.27 0.02 55);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.27 0.02 55);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.27 0.02 55);
+
+  --primary: oklch(0.46 0.06 55);           /* espresso */
+  --primary-foreground: oklch(0.98 0.01 85);
+
+  --secondary: oklch(0.94 0.02 80);
+  --secondary-foreground: oklch(0.3 0.03 55);
+
+  --muted: oklch(0.955 0.012 80);
+  --muted-foreground: oklch(0.53 0.02 60);
+
+  --accent: oklch(0.82 0.09 70);            /* caramel */
+  --accent-foreground: oklch(0.28 0.04 55);
+
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 85);
+
+  --border: oklch(0.9 0.015 80);
+  --input: oklch(0.9 0.015 80);
+  --ring: oklch(0.46 0.06 55);
+}
+
+.dark {
+  --background: oklch(0.21 0.015 55);
+  --foreground: oklch(0.95 0.01 85);
+
+  --card: oklch(0.25 0.018 55);
+  --card-foreground: oklch(0.95 0.01 85);
+
+  --popover: oklch(0.25 0.018 55);
+  --popover-foreground: oklch(0.95 0.01 85);
+
+  --primary: oklch(0.74 0.08 68);           /* lifted caramel for contrast */
+  --primary-foreground: oklch(0.22 0.03 55);
+
+  --secondary: oklch(0.3 0.02 55);
+  --secondary-foreground: oklch(0.95 0.01 85);
+
+  --muted: oklch(0.3 0.02 55);
+  --muted-foreground: oklch(0.7 0.02 65);
+
+  --accent: oklch(0.5 0.06 62);
+  --accent-foreground: oklch(0.97 0.01 85);
+
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.98 0.01 85);
+
+  --border: oklch(0.35 0.015 55);
+  --input: oklch(0.35 0.015 55);
+  --ring: oklch(0.74 0.08 68);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-tajawal), "Tajawal", ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ── Thermal receipt printing (80mm) ───────────────────────────────────────
+   Scoped with :has() so ONLY pages that render a receipt hijack printing —
+   other pages (e.g. the QR-sticker sheet) print normally. */
+@media print {
+  body:has(.receipt-print) {
+    /* 80mm roll */
+  }
+  @page {
+    margin: 8mm;
+  }
+  body:has(.receipt-print) * {
+    visibility: hidden;
+  }
+  body:has(.receipt-print) .receipt-print,
+  body:has(.receipt-print) .receipt-print * {
+    visibility: visible;
+  }
+  .receipt-print {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: 80mm;
+    padding: 4mm;
+    color: #000;
+    background: #fff;
+  }
+}
