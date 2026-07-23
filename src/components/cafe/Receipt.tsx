@@ -11,6 +11,8 @@ export type ReceiptData = {
   table?: string | null;
   /** ticket heading override (e.g. «طلب جديد — لم يُدفع») */
   heading?: string;
+  /** free-text order note («سكر قليل…») */
+  note?: string | null;
 };
 
 /** 80mm thermal receipt. Hidden on screen; the only thing visible when printing
@@ -47,6 +49,11 @@ export function Receipt({ data }: { data: ReceiptData }) {
           ))}
         </tbody>
       </table>
+      {data.note && (
+        <div style={{ border: "1px solid #000", padding: "3px 5px", margin: "3px 0", fontWeight: 800, fontSize: "13px" }}>
+          📝 {data.note}
+        </div>
+      )}
       <div style={{ borderTop: "1px dashed #000", margin: "4px 0" }} />
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
         <span>المجموع</span>

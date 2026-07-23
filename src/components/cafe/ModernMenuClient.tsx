@@ -87,6 +87,7 @@ export function ModernMenuClient({
   const [busy, setBusy] = useState(false);
   const [custName, setCustName] = useState("");
   const [custPhone, setCustPhone] = useState("");
+  const [orderNote, setOrderNote] = useState("");
   const [confirmed, setConfirmed] = useState<{ orderNumber: string; cardSerial: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -155,6 +156,7 @@ export function ModernMenuClient({
       lines: payload,
       name: custName.trim() || null,
       phone: custPhone.trim() || null,
+      note: orderNote.trim() || null,
     });
     setBusy(false);
     if (!res.ok) {
@@ -162,6 +164,7 @@ export function ModernMenuClient({
       return;
     }
     dispatch({ type: "clear" });
+    setOrderNote("");
     setCartOpen(false);
     setConfirmed({ orderNumber: res.orderNumber, cardSerial: res.cardSerial ?? null });
     if (res.orderId) {
@@ -318,6 +321,16 @@ export function ModernMenuClient({
                 />
               </div>
             </div>
+
+            {/* order note */}
+            <textarea
+              value={orderNote}
+              onChange={(e) => setOrderNote(e.target.value)}
+              placeholder="📝 ملاحظات الطلب (اختياري): سكر قليل، بدون سكر، حليب إضافي…"
+              rows={2}
+              maxLength={300}
+              className="mt-3 w-full resize-none rounded-xl border border-[#d18b4a]/30 bg-transparent px-3 py-2 text-sm outline-none placeholder:text-[#f3e3cf]/40 focus:border-[#d18b4a]"
+            />
 
             {err && <p className="mt-3 text-sm text-red-400">{err}</p>}
             <div className="mt-4 flex items-center justify-between border-t border-[#d18b4a]/20 pt-4">

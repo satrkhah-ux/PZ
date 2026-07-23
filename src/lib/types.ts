@@ -156,7 +156,7 @@ export type Database = {
     };
     Functions: {
       place_order: {
-        Args: { p_channel: OrderChannel; p_lines: Json; p_customer?: string | null; p_table?: string | null };
+        Args: { p_channel: OrderChannel; p_lines: Json; p_customer?: string | null; p_table?: string | null; p_note?: string | null };
         Returns: { order_id: string; order_seq: number }[];
       };
       mark_order_paid: {

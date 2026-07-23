@@ -16,6 +16,7 @@ export type PendingOrder = {
   channel: string;
   subtotal: number;
   table_no: string | null;
+  note: string | null;
   created_at: string;
   items: PendingItem[];
 };
@@ -26,7 +27,7 @@ export async function listPendingOrders(): Promise<PendingOrder[]> {
   const supabase = await createSupabaseServerClient();
   const { data: orders } = await supabase
     .from("orders")
-    .select("id, order_seq, channel, subtotal, table_no, created_at")
+    .select("id, order_seq, channel, subtotal, table_no, note, created_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true });
   if (!orders?.length) return [];
@@ -49,6 +50,7 @@ export async function listPendingOrders(): Promise<PendingOrder[]> {
     channel: o.channel,
     subtotal: o.subtotal,
     table_no: o.table_no,
+    note: o.note,
     created_at: o.created_at,
     items: byOrder.get(o.id) ?? [],
   }));
@@ -90,6 +92,7 @@ export async function cashierCheckout(input: {
   discount?: number;
   customerId?: string | null;
   table?: string | null;
+  note?: string | null;
 }): Promise<CheckoutResult> {
   await requireStaff();
   if (!input.lines?.length) return { ok: false, error: "لا توجد أصناف في الطلب." };
@@ -100,6 +103,7 @@ export async function cashierCheckout(input: {
     p_lines: input.lines as unknown as Json,
     p_customer: input.customerId ?? null,
     p_table: input.table?.trim() || null,
+    p_note: input.note?.trim() || null,
   });
   if (error || !placed?.[0]) return { ok: false, error: error?.message ?? "تعذّر إنشاء الطلب." };
 

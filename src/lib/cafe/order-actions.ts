@@ -19,6 +19,8 @@ export type SubmitOrderInput = {
   /** optional customer capture — builds the loyalty base */
   name?: string | null;
   phone?: string | null;
+  /** free-text order note («سكر قليل، بدون سكر…») */
+  note?: string | null;
 };
 
 export type SubmitOrderResult =
@@ -58,6 +60,7 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
     p_lines: input.lines as unknown as Json,
     p_customer: customerId,
     p_table: input.table?.trim() || null,
+    p_note: input.note?.trim() || null,
   });
   if (error || !data?.[0]) return { ok: false, error: "تعذّر إرسال الطلب، حاول مجدداً." };
   // alert subscribed staff devices even when the app is closed (never throws)

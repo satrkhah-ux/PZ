@@ -65,6 +65,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   // dine-in orders carry a table number → they show on the live tables screen
   const [orderType, setOrderType] = useState<"takeaway" | "dinein">("takeaway");
   const [tableNo, setTableNo] = useState("");
+  const [orderNote, setOrderNote] = useState("");
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
@@ -124,7 +125,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setErr(null);
     const table = orderType === "dinein" ? tableNo : null;
     const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null, table });
+    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
     setBusy(false);
     if (!res.ok) {
       setErr(res.error);
@@ -133,6 +134,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setReceipt({
       orderNumber: res.orderNumber,
       table,
+      note: orderNote.trim() || null,
       lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
       subtotal,
       discount,
@@ -155,6 +157,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setPayMethod("cash");
     setOrderType("takeaway");
     setTableNo("");
+    setOrderNote("");
   }
 
   return (
@@ -274,6 +277,15 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
             <span>{formatIqdLabel(total)}</span>
           </div>
         </div>
+
+        {/* order note */}
+        <input
+          value={orderNote}
+          onChange={(e) => setOrderNote(e.target.value)}
+          placeholder="📝 ملاحظات: سكر قليل، بدون سكر…"
+          maxLength={300}
+          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+        />
 
         {err && <p className="text-sm text-destructive">{err}</p>}
 

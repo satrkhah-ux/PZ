@@ -17,6 +17,20 @@ function ageMinutes(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
 }
 
+function ticketFor(o: PendingOrder, heading?: string): ReceiptData {
+  return {
+    orderNumber: String(o.order_seq).padStart(3, "0"),
+    heading,
+    table: o.table_no,
+    note: o.note,
+    lines: o.items.map((it) => ({ name: it.name_ar, flavor: it.flavor_ar, qty: it.qty, unitPrice: it.unit_price })),
+    subtotal: o.subtotal,
+    discount: 0,
+    total: o.subtotal,
+    dateTime: new Date().toLocaleString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }),
+  };
+}
+
 /** Dedicated incoming-orders screen: the counter's live queue of table
  *  self-orders, with auto-print and cash-drawer device toggles. */
 export function IncomingOrdersClient() {
@@ -68,16 +82,7 @@ export function IncomingOrdersClient() {
         if (fresh.length) {
           setTickets((q) => [
             ...q,
-            ...fresh.map((o) => ({
-              orderNumber: String(o.order_seq).padStart(3, "0"),
-              heading: "طلب جديد — غير مدفوع",
-              table: o.table_no,
-              lines: o.items.map((it) => ({ name: it.name_ar, flavor: it.flavor_ar, qty: it.qty, unitPrice: it.unit_price })),
-              subtotal: o.subtotal,
-              discount: 0,
-              total: o.subtotal,
-              dateTime: new Date().toLocaleString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }),
-            })),
+            ...fresh.map((o) => ticketFor(o, "طلب جديد — غير مدفوع")),
           ]);
         }
       }
@@ -95,9 +100,14 @@ export function IncomingOrdersClient() {
 
   async function accept(id: string, method: "cash" | "card") {
     setQueueErr(null);
+    const o = pending.find((p) => p.id === id);
     const res = await payPendingOrder(id);
     if (!res.ok) setQueueErr(res.error);
-    else if (method === "cash") kickDrawer();
+    else {
+      if (method === "cash") kickDrawer();
+      // print the paid receipt for the customer (silent under --kiosk-printing)
+      if (o) setTickets((q) => [...q, ticketFor(o)]);
+    }
     void refreshPending();
   }
   async function reject(id: string) {
@@ -153,6 +163,9 @@ export function IncomingOrdersClient() {
                   <span>·</span>
                   <span className={age >= 10 ? "font-bold text-destructive" : ""}>{age === 0 ? "الآن" : `منذ ${age} د`}</span>
                 </div>
+                {o.note && (
+                  <p className="mt-2 rounded-lg border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 text-sm font-bold">📝 {o.note}</p>
+                )}
                 <ul className="my-3 flex-1 space-y-1 text-sm">
                   {o.items.map((it, i) => (
                     <li key={i} className="flex items-center justify-between gap-2">
