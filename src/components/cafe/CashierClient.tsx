@@ -69,6 +69,8 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
   const [pending, setPending] = useState<PendingOrder[]>([]);
   const [queueErr, setQueueErr] = useState<string | null>(null);
+  // cash opens the drawer; Qi-card payments happen on the Qi device — no drawer.
+  const [payMethod, setPayMethod] = useState<"cash" | "card">("cash");
 
   // cash drawer: kick the drawer via the local agent on every confirmed payment.
   // Requires scripts/drawer-agent.ps1 running on the cashier machine.
@@ -210,20 +212,21 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         year: "numeric",
       }),
     });
-    kickDrawer();
+    if (payMethod === "cash") kickDrawer();
     setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });
     dispatch({ type: "clear" });
     setCustomer(null);
     setDiscount(0);
     setSerialInput("");
+    setPayMethod("cash");
     void refreshPending();
   }
 
-  async function acceptPending(id: string) {
+  async function acceptPending(id: string, method: "cash" | "card") {
     setQueueErr(null);
     const res = await payPendingOrder(id);
     if (!res.ok) setQueueErr(res.error);
-    else kickDrawer();
+    else if (method === "cash") kickDrawer();
     void refreshPending();
   }
   async function rejectPending(id: string) {
@@ -296,8 +299,11 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold">{formatIqdLabel(o.subtotal)}</span>
                     <div className="flex gap-1.5">
-                      <button onClick={() => acceptPending(o.id)} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
-                        تأكيد الدفع
+                      <button onClick={() => acceptPending(o.id, "cash")} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
+                        💵 نقدي
+                      </button>
+                      <button onClick={() => acceptPending(o.id, "card")} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground hover:opacity-90">
+                        💳 كي كارد
                       </button>
                       <button onClick={() => rejectPending(o.id)} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-secondary">
                         إلغاء
@@ -405,12 +411,26 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
 
         {err && <p className="text-sm text-destructive">{err}</p>}
 
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-secondary/60 p-1.5">
+          <button
+            onClick={() => setPayMethod("cash")}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${payMethod === "cash" ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+          >
+            💵 نقدي
+          </button>
+          <button
+            onClick={() => setPayMethod("card")}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${payMethod === "card" ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+          >
+            💳 كي كارد
+          </button>
+        </div>
         <button
           onClick={checkout}
           disabled={busy || lines.length === 0}
           className="w-full rounded-xl bg-primary px-4 py-3 font-bold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
         >
-          {busy ? "جارٍ التنفيذ…" : "دفع نقدي وإصدار الطلب"}
+          {busy ? "جارٍ التنفيذ…" : payMethod === "cash" ? "دفع نقدي وإصدار الطلب" : "دفع كي كارد وإصدار الطلب"}
         </button>
       </aside>
 
