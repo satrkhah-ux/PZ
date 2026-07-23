@@ -1,10 +1,9 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { PrintButton } from "@/components/cafe/PrintButton";
+import { TABLE_COUNT } from "@/lib/cafe/tables";
 
 export const dynamic = "force-dynamic";
-
-const TABLE_COUNT = 12;
 
 /** Printable QR stickers: the general menu QR + one per table (?t=N).
  *  Defaults to the current origin; pass ?base=https://your-domain after deploy. */

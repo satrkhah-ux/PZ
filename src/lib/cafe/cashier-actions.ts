@@ -83,11 +83,13 @@ export type CheckoutResult =
   | { ok: true; orderNumber: string; total: number; awarded: number }
   | { ok: false; error: string };
 
-/** Cashier: create an order and mark it paid in one step (pay at counter). */
+/** Cashier: create an order and mark it paid in one step (pay at counter).
+ *  A table number means dine-in — it feeds the live tables screen. */
 export async function cashierCheckout(input: {
   lines: OrderLineInput[];
   discount?: number;
   customerId?: string | null;
+  table?: string | null;
 }): Promise<CheckoutResult> {
   await requireStaff();
   if (!input.lines?.length) return { ok: false, error: "لا توجد أصناف في الطلب." };
@@ -97,6 +99,7 @@ export async function cashierCheckout(input: {
     p_channel: "cashier",
     p_lines: input.lines as unknown as Json,
     p_customer: input.customerId ?? null,
+    p_table: input.table?.trim() || null,
   });
   if (error || !placed?.[0]) return { ok: false, error: error?.message ?? "تعذّر إنشاء الطلب." };
 

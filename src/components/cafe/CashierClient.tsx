@@ -5,6 +5,7 @@ import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { cashierCheckout } from "@/lib/cafe/cashier-actions";
+import { TABLE_COUNT } from "@/lib/cafe/tables";
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
@@ -61,6 +62,9 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
   // cash opens the drawer; Qi-card payments happen on the Qi device — no drawer.
   const [payMethod, setPayMethod] = useState<"cash" | "card">("cash");
+  // dine-in orders carry a table number → they show on the live tables screen
+  const [orderType, setOrderType] = useState<"takeaway" | "dinein">("takeaway");
+  const [tableNo, setTableNo] = useState("");
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
@@ -112,10 +116,15 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
 
   async function checkout() {
     if (!lines.length || busy) return;
+    if (orderType === "dinein" && !tableNo) {
+      setErr("اختر رقم الطاولة.");
+      return;
+    }
     setBusy(true);
     setErr(null);
+    const table = orderType === "dinein" ? tableNo : null;
     const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null });
+    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null, table });
     setBusy(false);
     if (!res.ok) {
       setErr(res.error);
@@ -123,6 +132,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     }
     setReceipt({
       orderNumber: res.orderNumber,
+      table,
       lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
       subtotal,
       discount,
@@ -143,6 +153,8 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setDiscount(0);
     setSerialInput("");
     setPayMethod("cash");
+    setOrderType("takeaway");
+    setTableNo("");
   }
 
   return (
@@ -262,6 +274,40 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         </div>
 
         {err && <p className="text-sm text-destructive">{err}</p>}
+
+        {/* dine-in / takeaway */}
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-secondary/60 p-1.5">
+          <button
+            onClick={() => {
+              setOrderType("takeaway");
+              setTableNo("");
+            }}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${orderType === "takeaway" ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+          >
+            🥡 خارجي
+          </button>
+          <button
+            onClick={() => setOrderType("dinein")}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${orderType === "dinein" ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+          >
+            🏠 داخل المحل
+          </button>
+        </div>
+        {orderType === "dinein" && (
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: TABLE_COUNT }, (_, i) => String(i + 1)).map((n) => (
+              <button
+                key={n}
+                onClick={() => setTableNo(n)}
+                className={`size-9 rounded-lg border text-sm font-bold transition ${
+                  tableNo === n ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-secondary"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-secondary/60 p-1.5">
           <button
