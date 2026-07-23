@@ -18,11 +18,21 @@ function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   return arr;
 }
 
+// Shared AudioContext: browsers keep audio suspended until a user gesture,
+// so we create ONE context, resume it on the first tap/click anywhere, and
+// reuse it for every chime (a fresh context per chime stays silently blocked).
+let audioCtx: AudioContext | null = null;
+function getAudioCtx(): AudioContext {
+  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+  audioCtx ??= new Ctx();
+  if (audioCtx.state === "suspended") void audioCtx.resume();
+  return audioCtx;
+}
+
 /** two-tone chime for a new incoming order (WebAudio — no asset needed) */
 function chime() {
   try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new Ctx();
+    const ctx = getAudioCtx();
     [880, 1175].forEach((freq, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -77,6 +87,20 @@ export function StaffShell({
     } catch {
       /* demo mode: no supabase env */
     }
+  }, []);
+
+  // unlock audio on the first interaction so later chimes actually sound
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        getAudioCtx();
+      } catch {
+        /* no audio device */
+      }
+      window.removeEventListener("pointerdown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    return () => window.removeEventListener("pointerdown", unlock);
   }, []);
 
   // new-order alert on EVERY staff screen: poll pending self-orders, badge the
@@ -190,6 +214,14 @@ export function StaffShell({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:inline">{name}</span>
+            <button
+              onClick={chime}
+              aria-label="تجربة صوت التنبيه"
+              title="تجربة صوت التنبيه — إن لم تسمع شيئاً افحص صوت الجهاز"
+              className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-secondary"
+            >
+              🔊
+            </button>
             {pushState !== "unsupported" && (
               <button
                 onClick={togglePush}
