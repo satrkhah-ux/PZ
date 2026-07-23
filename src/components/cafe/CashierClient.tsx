@@ -4,13 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
-import {
-  cashierCheckout,
-  listPendingOrders,
-  payPendingOrder,
-  cancelOrder,
-  type PendingOrder,
-} from "@/lib/cafe/cashier-actions";
+import { cashierCheckout } from "@/lib/cafe/cashier-actions";
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
@@ -53,8 +47,6 @@ function cartReducer(state: Cart, action: CartAction): Cart {
   }
 }
 
-const CHANNEL_AR: Record<string, string> = { qr: "موبايل", kiosk: "لوحي", cashier: "كاشير" };
-
 export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const [cart, dispatch] = useReducer(cartReducer, {});
@@ -67,92 +59,24 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [err, setErr] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
-  const [pending, setPending] = useState<PendingOrder[]>([]);
-  const [queueErr, setQueueErr] = useState<string | null>(null);
   // cash opens the drawer; Qi-card payments happen on the Qi device — no drawer.
   const [payMethod, setPayMethod] = useState<"cash" | "card">("cash");
 
-  // cash drawer: kick the drawer via the local agent on every confirmed payment.
-  // Requires scripts/drawer-agent.ps1 running on the cashier machine.
-  const [drawerKick, setDrawerKick] = useState(false);
+  // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a persisted device setting
-    setDrawerKick(localStorage.getItem("pz-drawer") === "1");
+    drawerKickRef.current = localStorage.getItem("pz-drawer") === "1";
   }, []);
-  useEffect(() => {
-    drawerKickRef.current = drawerKick;
-    localStorage.setItem("pz-drawer", drawerKick ? "1" : "0");
-  }, [drawerKick]);
   function kickDrawer() {
     if (!drawerKickRef.current) return;
     // localhost is exempt from mixed-content blocking; fire-and-forget
     fetch("http://127.0.0.1:9977/kick", { mode: "no-cors" }).catch(() => {});
   }
 
-  // auto-print incoming self-orders (تذكرة مباشرة للطابعة). Persisted per device.
-  const [autoPrint, setAutoPrint] = useState(false);
-  const [tickets, setTickets] = useState<ReceiptData[]>([]);
-  const seenIds = useRef<Set<string> | null>(null);
-  const autoPrintRef = useRef(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a persisted device setting
-    setAutoPrint(localStorage.getItem("pz-autoprint") === "1");
-  }, []);
-  useEffect(() => {
-    autoPrintRef.current = autoPrint;
-    localStorage.setItem("pz-autoprint", autoPrint ? "1" : "0");
-  }, [autoPrint]);
-  // print the queued tickets one by one
-  useEffect(() => {
-    if (!tickets.length) return;
-    const t = setTimeout(() => {
-      window.print();
-      setTickets((q) => q.slice(1));
-    }, 400);
-    return () => clearTimeout(t);
-  }, [tickets]);
-
   const lines = Object.values(cart);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const total = Math.max(0, subtotal - discount);
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
-
-  // ponytail: 5s poll for incoming self-orders — swap to Supabase realtime if volume grows.
-  const refreshPending = useCallback(async () => {
-    try {
-      const orders = await listPendingOrders();
-      setPending(orders);
-      // auto-print any order we have not seen before (skip the very first load)
-      if (seenIds.current && autoPrintRef.current) {
-        const fresh = orders.filter((o) => !seenIds.current!.has(o.id));
-        if (fresh.length) {
-          setTickets((q) => [
-            ...q,
-            ...fresh.map((o) => ({
-              orderNumber: String(o.order_seq).padStart(3, "0"),
-              heading: "طلب جديد — غير مدفوع",
-              table: o.table_no,
-              lines: o.items.map((it) => ({ name: it.name_ar, flavor: it.flavor_ar, qty: it.qty, unitPrice: it.unit_price })),
-              subtotal: o.subtotal,
-              discount: 0,
-              total: o.subtotal,
-              dateTime: new Date().toLocaleString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }),
-            })),
-          ]);
-        }
-      }
-      seenIds.current = new Set(orders.map((o) => o.id));
-    } catch {
-      /* ignore transient errors */
-    }
-  }, []);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state is set after an await
-    refreshPending();
-    const t = setInterval(refreshPending, 5000);
-    return () => clearInterval(t);
-  }, [refreshPending]);
 
   async function lookup(serial: string) {
     const s = serial.trim();
@@ -219,21 +143,6 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setDiscount(0);
     setSerialInput("");
     setPayMethod("cash");
-    void refreshPending();
-  }
-
-  async function acceptPending(id: string, method: "cash" | "card") {
-    setQueueErr(null);
-    const res = await payPendingOrder(id);
-    if (!res.ok) setQueueErr(res.error);
-    else if (method === "cash") kickDrawer();
-    void refreshPending();
-  }
-  async function rejectPending(id: string) {
-    setQueueErr(null);
-    const res = await cancelOrder(id);
-    if (!res.ok) setQueueErr(res.error);
-    void refreshPending();
   }
 
   return (
@@ -258,63 +167,6 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
             <CashierItem key={it.id} item={it} category={cat?.name_ar} onAdd={(line) => dispatch({ type: "add", line })} />
           ))}
         </div>
-
-        {/* incoming self-orders */}
-        <section className="space-y-2 pt-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-muted-foreground">الطلبات الواردة (موبايل/لوحي) — {pending.length}</h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} className="accent-[#6f4e37]" />
-                🖨️ طباعة تلقائية للطلبات الواردة
-              </label>
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                <input type="checkbox" checked={drawerKick} onChange={(e) => setDrawerKick(e.target.checked)} className="accent-[#6f4e37]" />
-                💰 فتح القاصة عند الدفع
-              </label>
-            </div>
-          </div>
-          {queueErr && <p className="text-sm text-destructive">{queueErr}</p>}
-          {pending.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">لا توجد طلبات معلّقة.</p>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {pending.map((o) => (
-                <div key={o.id} className="rounded-xl border border-border bg-card p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold">#{String(o.order_seq).padStart(3, "0")}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {CHANNEL_AR[o.channel] ?? o.channel}
-                      {o.table_no ? ` · طاولة ${o.table_no}` : ""}
-                    </span>
-                  </div>
-                  <ul className="my-2 space-y-0.5 text-sm text-muted-foreground">
-                    {o.items.map((it, i) => (
-                      <li key={i}>
-                        {it.name_ar}
-                        {it.flavor_ar ? ` (${it.flavor_ar})` : ""} ×{it.qty}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold">{formatIqdLabel(o.subtotal)}</span>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => acceptPending(o.id, "cash")} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
-                        💵 نقدي
-                      </button>
-                      <button onClick={() => acceptPending(o.id, "card")} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-foreground hover:opacity-90">
-                        💳 كي كارد
-                      </button>
-                      <button onClick={() => rejectPending(o.id)} className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-secondary">
-                        إلغاء
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
       </section>
 
       {/* order panel */}
@@ -461,8 +313,8 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         </div>
       )}
 
-      {/* print-only: incoming-order ticket takes priority, else the checkout receipt */}
-      {tickets[0] ? <Receipt data={tickets[0]} /> : receipt && <Receipt data={receipt} />}
+      {/* print-only checkout receipt */}
+      {receipt && <Receipt data={receipt} />}
     </div>
   );
 }

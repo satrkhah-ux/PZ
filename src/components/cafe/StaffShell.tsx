@@ -34,6 +34,7 @@ function chime() {
 const NAV: { href: string; label: string; adminOnly: boolean }[] = [
   { href: "/dashboard", label: "لوحة التحكم", adminOnly: true },
   { href: "/cashier", label: "الكاشير", adminOnly: false },
+  { href: "/orders", label: "الطلبات الواردة", adminOnly: false },
   { href: "/menu-admin", label: "المنيو", adminOnly: true },
   { href: "/loyalty", label: "الولاء", adminOnly: false },
   { href: "/expenses", label: "المصروفات", adminOnly: true },
@@ -128,7 +129,7 @@ export function StaffShell({
                   }`}
                 >
                   {l.label}
-                  {l.href === "/cashier" && pendingCount > 0 && (
+                  {l.href === "/orders" && pendingCount > 0 && (
                     <span className="absolute -left-1 -top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
                       {pendingCount}
                     </span>
@@ -150,7 +151,7 @@ export function StaffShell({
       {/* new-order toast */}
       {toast && (
         <Link
-          href="/cashier"
+          href="/orders"
           onClick={() => setToast(null)}
           className="fixed inset-x-4 top-16 z-50 mx-auto flex max-w-md items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-4 py-3 text-primary-foreground shadow-xl print:hidden"
         >

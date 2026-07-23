@@ -39,8 +39,11 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
     try {
       // phone numbers & usernames map to <login>@pizzara.iq auth accounts
       const email = login.includes("@") ? login.trim() : `${login.trim()}@pizzara.iq`;
+      // Supabase enforces >=6-char passwords; short PINs (e.g. the cashier's
+      // «123») are stored zero-padded to 6, so pad the same way on login.
+      const realPassword = password.length < 6 ? password.padEnd(6, "0") : password;
       const supabase = createSupabaseBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: realPassword });
       if (signInError) {
         setError(t("auth.error"));
         return;
