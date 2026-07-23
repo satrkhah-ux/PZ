@@ -1,7 +1,13 @@
-/** Physical tables in the cafe (matches the printed QR stickers). */
-export const TABLE_COUNT = 12;
+/** Physical tables in the cafe (matches the printed QR stickers):
+ *  12 indoor + 2 outdoor. table_no is free text, so named tables just work. */
+export const TABLES: string[] = [...Array.from({ length: 12 }, (_, i) => String(i + 1)), "خارجي 1", "خارجي 2"];
 /** Minutes a table stays «مشغولة» after payment before auto-freeing. */
 export const SEATED_MINUTES = 30;
+
+/** «طاولة 5» for numeric tables, the name itself for named ones (خارجي 1). */
+export function tableLabel(t: string): string {
+  return /^\d+$/.test(t) ? `طاولة ${t}` : t;
+}
 
 export type TableOrderRow = {
   order_seq: number;
@@ -26,7 +32,7 @@ export type TableStatus = {
 /** Derive per-table occupancy from recent orders (rows newest-first).
  *  Pending order → مشغولة (unpaid). Paid within SEATED_MINUTES → مشغولة
  *  (customer having their drink), then auto-free. Pure — unit-tested. */
-export function deriveTableStatuses(rows: TableOrderRow[], now: number, tableCount = TABLE_COUNT): TableStatus[] {
+export function deriveTableStatuses(rows: TableOrderRow[], now: number, tables: string[] = TABLES): TableStatus[] {
   const map = new Map<string, TableStatus>();
   for (const o of rows) {
     const t = o.table_no?.trim();
@@ -51,15 +57,17 @@ export function deriveTableStatuses(rows: TableOrderRow[], now: number, tableCou
       }
     }
   }
-  // fixed tables 1..N plus any extra table numbers seen in orders
-  const names = new Set<string>(Array.from({ length: tableCount }, (_, i) => String(i + 1)));
-  for (const t of map.keys()) names.add(t);
-  return [...names]
-    .map((t) => map.get(t) ?? { table: t, state: "free" as const, seq: null, sinceMin: null, freeInMin: null, subtotal: null })
+  // the fixed table list in its defined order, then any extra numbers seen in orders
+  const known = new Set(tables);
+  const extras = [...map.keys()]
+    .filter((t) => !known.has(t))
     .sort((a, b) => {
-      const na = Number(a.table);
-      const nb = Number(b.table);
+      const na = Number(a);
+      const nb = Number(b);
       if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-      return a.table.localeCompare(b.table, "ar");
+      return a.localeCompare(b, "ar");
     });
+  return [...tables, ...extras].map(
+    (t) => map.get(t) ?? { table: t, state: "free" as const, seq: null, sinceMin: null, freeInMin: null, subtotal: null },
+  );
 }

@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      register_closures: {
+        Row: { business_day: string; remaining: number; note: string | null; closed_by: string | null; created_at: string; updated_at: string };
+        Insert: { business_day: string; remaining: number; note?: string | null; closed_by?: string | null; created_at?: string; updated_at?: string };
+        Update: Partial<{ remaining: number; note: string | null; closed_by: string | null; updated_at: string }>;
+        Relationships: [];
+      };
       push_subscriptions: {
         Row: Timestamped & { endpoint: string; p256dh: string; auth: string };
         Insert: { id?: string; endpoint: string; p256dh: string; auth: string; created_at?: string };

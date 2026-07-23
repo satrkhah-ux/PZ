@@ -10,7 +10,7 @@ function row(p: Partial<TableOrderRow>): TableOrderRow {
 
 describe("deriveTableStatuses", () => {
   it("pending order marks the table busy", () => {
-    const [t1] = deriveTableStatuses([row({ status: "pending", table_no: "1", created_at: min(7) })], NOW, 2);
+    const [t1] = deriveTableStatuses([row({ status: "pending", table_no: "1", created_at: min(7) })], NOW, ["1", "2"]);
     expect(t1.state).toBe("pending");
     expect(t1.sinceMin).toBe(7);
   });
@@ -19,7 +19,7 @@ describe("deriveTableStatuses", () => {
     const res = deriveTableStatuses(
       [row({ table_no: "1", paid_at: min(10) }), row({ table_no: "2", paid_at: min(SEATED_MINUTES + 1) })],
       NOW,
-      2,
+      ["1", "2"],
     );
     expect(res[0].state).toBe("seated");
     expect(res[0].freeInMin).toBe(SEATED_MINUTES - 10);
@@ -30,15 +30,16 @@ describe("deriveTableStatuses", () => {
     const res = deriveTableStatuses(
       [row({ table_no: "3", paid_at: min(2), order_seq: 9 }), row({ status: "pending", table_no: "3", created_at: min(20), order_seq: 8 })],
       NOW,
-      3,
+      ["1", "2", "3"],
     );
     expect(res[2].state).toBe("pending");
     expect(res[2].seq).toBe(8);
   });
 
-  it("fills the fixed table list and appends unknown table numbers sorted", () => {
-    const res = deriveTableStatuses([row({ table_no: "15", paid_at: min(1) })], NOW, 3);
-    expect(res.map((t) => t.table)).toEqual(["1", "2", "3", "15"]);
+  it("keeps the defined order (incl. named outdoor tables) and appends unknowns", () => {
+    const res = deriveTableStatuses([row({ table_no: "15", paid_at: min(1) })], NOW, ["1", "2", "خارجي 1"]);
+    expect(res.map((t) => t.table)).toEqual(["1", "2", "خارجي 1", "15"]);
     expect(res[3].state).toBe("seated");
+    expect(res[2].state).toBe("free");
   });
 });

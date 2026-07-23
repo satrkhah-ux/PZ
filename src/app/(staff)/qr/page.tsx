@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { PrintButton } from "@/components/cafe/PrintButton";
-import { TABLE_COUNT } from "@/lib/cafe/tables";
+import { TABLES, tableLabel } from "@/lib/cafe/tables";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +23,10 @@ export default async function QrPage({
   const opts = { margin: 1, color: { dark: "#42301f", light: "#ffffff" } };
   const menuQr = await QRCode.toDataURL(`${base}${menuPath}`, { ...opts, width: 380 });
   const tables = await Promise.all(
-    Array.from({ length: TABLE_COUNT }, (_, i) => i + 1).map(async (n) => ({
+    TABLES.map(async (n) => ({
       n,
-      qr: await QRCode.toDataURL(`${base}${menuPath}?t=${n}`, { ...opts, width: 300 }),
+      label: tableLabel(n),
+      qr: await QRCode.toDataURL(`${base}${menuPath}?t=${encodeURIComponent(n)}`, { ...opts, width: 300 }),
     })),
   );
 
@@ -57,9 +58,9 @@ export default async function QrPage({
         {tables.map((t) => (
           <div key={t.n} className="break-inside-avoid rounded-2xl border-2 border-primary bg-card p-4 text-center">
             <p className="font-extrabold text-primary">بيزارا كافيه</p>
-            <p className="mb-2 text-lg font-bold">طاولة {t.n}</p>
+            <p className="mb-2 text-lg font-bold">{t.label}</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={t.qr} alt={`طاولة ${t.n}`} className="mx-auto size-40" />
+            <img src={t.qr} alt={t.label} className="mx-auto size-40" />
             <p className="mt-1.5 text-xs text-muted-foreground">امسح للطلب من طاولتك</p>
           </div>
         ))}

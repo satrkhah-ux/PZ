@@ -47,7 +47,7 @@ const NAV: { href: string; label: string; adminOnly: boolean }[] = [
   { href: "/tables", label: "الطاولات", adminOnly: false },
   { href: "/menu-admin", label: "المنيو", adminOnly: true },
   { href: "/loyalty", label: "الولاء", adminOnly: false },
-  { href: "/expenses", label: "المصروفات", adminOnly: true },
+  { href: "/expenses", label: "المصروفات", adminOnly: false },
   { href: "/employees", label: "الموظفون", adminOnly: true },
   { href: "/qr", label: "رموز QR", adminOnly: true },
 ];

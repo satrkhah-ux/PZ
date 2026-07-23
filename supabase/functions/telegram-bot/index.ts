@@ -205,13 +205,17 @@ async function viewDailyFinal() {
   const today = baghdadDay();
   const t = sumRows(await summary(today, today));
   const sold = (await aggregateSold(today)).filter(([, q]) => q > 0);
+  const closure = (await rest(`register_closures?business_day=eq.${today}&select=remaining,note`))[0];
   const lines = [
     `🌙 <b>التقرير اليومي النهائي — ${today}</b>`, "",
     `🧾 عدد الطلبات: <b>${t.c}</b>`,
     `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
     `📈 الأرباح: <b>${fmt(t.p)} د.ع</b>`,
     `📉 المصروفات: <b>${fmt(t.e)} د.ع</b>`,
-    `✅ الصافي: <b>${fmt(t.n)} د.ع</b>`, "",
+    `✅ الصافي: <b>${fmt(t.n)} د.ع</b>`,
+    closure
+      ? `🏦 المتبقي في الصندوق: <b>${fmt(closure.remaining)} د.ع</b>${closure.note ? ` — ${esc(closure.note)}` : ""}`
+      : `🏦 المتبقي في الصندوق: لم يُسجَّل (يُدخل من صفحة المصروفات)`, "",
     `☕️ <b>الأصناف المباعة اليوم (${sold.reduce((s, [, q]) => s + q, 0)} قطعة):</b>`,
   ];
   if (sold.length === 0) lines.push("لا مبيعات اليوم.");

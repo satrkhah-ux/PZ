@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Armchair } from "lucide-react";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { listTableStatus } from "@/lib/cafe/table-actions";
-import { SEATED_MINUTES, type TableStatus } from "@/lib/cafe/tables";
+import { SEATED_MINUTES, tableLabel, type TableStatus } from "@/lib/cafe/tables";
 
 /** Live floor view: which tables are busy, paid-and-seated, or free. */
 export function TablesClient() {
@@ -70,7 +70,7 @@ export function TablesClient() {
                     : "border-border bg-card"
               }`}
             >
-              <p className="text-2xl font-extrabold">طاولة {t.table}</p>
+              <p className="text-2xl font-extrabold">{tableLabel(t.table)}</p>
               {t.state === "pending" && (
                 <div className="mt-1 space-y-0.5 text-sm">
                   <p className="font-bold text-destructive">🔴 طلب معلق #{String(t.seq).padStart(3, "0")}</p>
