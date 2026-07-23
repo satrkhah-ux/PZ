@@ -70,6 +70,24 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   const [pending, setPending] = useState<PendingOrder[]>([]);
   const [queueErr, setQueueErr] = useState<string | null>(null);
 
+  // cash drawer: kick the drawer via the local agent on every confirmed payment.
+  // Requires scripts/drawer-agent.ps1 running on the cashier machine.
+  const [drawerKick, setDrawerKick] = useState(false);
+  const drawerKickRef = useRef(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a persisted device setting
+    setDrawerKick(localStorage.getItem("pz-drawer") === "1");
+  }, []);
+  useEffect(() => {
+    drawerKickRef.current = drawerKick;
+    localStorage.setItem("pz-drawer", drawerKick ? "1" : "0");
+  }, [drawerKick]);
+  function kickDrawer() {
+    if (!drawerKickRef.current) return;
+    // localhost is exempt from mixed-content blocking; fire-and-forget
+    fetch("http://127.0.0.1:9977/kick", { mode: "no-cors" }).catch(() => {});
+  }
+
   // auto-print incoming self-orders (تذكرة مباشرة للطابعة). Persisted per device.
   const [autoPrint, setAutoPrint] = useState(false);
   const [tickets, setTickets] = useState<ReceiptData[]>([]);
@@ -192,6 +210,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         year: "numeric",
       }),
     });
+    kickDrawer();
     setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });
     dispatch({ type: "clear" });
     setCustomer(null);
@@ -204,6 +223,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
     setQueueErr(null);
     const res = await payPendingOrder(id);
     if (!res.ok) setQueueErr(res.error);
+    else kickDrawer();
     void refreshPending();
   }
   async function rejectPending(id: string) {
@@ -240,10 +260,16 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         <section className="space-y-2 pt-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-muted-foreground">الطلبات الواردة (موبايل/لوحي) — {pending.length}</h2>
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-              <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} className="accent-[#6f4e37]" />
-              🖨️ طباعة تلقائية للطلبات الواردة
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <input type="checkbox" checked={autoPrint} onChange={(e) => setAutoPrint(e.target.checked)} className="accent-[#6f4e37]" />
+                🖨️ طباعة تلقائية للطلبات الواردة
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <input type="checkbox" checked={drawerKick} onChange={(e) => setDrawerKick(e.target.checked)} className="accent-[#6f4e37]" />
+                💰 فتح القاصة عند الدفع
+              </label>
+            </div>
           </div>
           {queueErr && <p className="text-sm text-destructive">{queueErr}</p>}
           {pending.length === 0 ? (
