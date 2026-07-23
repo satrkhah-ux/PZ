@@ -134,7 +134,7 @@ if ($browser) {
   $ws = New-Object -ComObject WScript.Shell
   $lnk = $ws.CreateShortcut("$([Environment]::GetFolderPath('CommonDesktopDirectory'))\كاشير بيزارا.lnk")
   $lnk.TargetPath = $browser
-  $lnk.Arguments = "--kiosk-printing https://pizzara-modern.netlify.app/cashier"
+  $lnk.Arguments = "--kiosk-printing --start-maximized https://pizzara-modern.netlify.app/cashier"
   $lnk.IconLocation = "$browser,0"
   $lnk.Save()
   Say "اختصار «كاشير بيزارا» على سطح المكتب (طباعة صامتة — افتحه وكل نوافذ المتصفح الأخرى مغلقة)"

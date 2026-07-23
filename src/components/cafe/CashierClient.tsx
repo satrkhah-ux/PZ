@@ -158,9 +158,11 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+    // minmax(0,1fr) + min-w-0: without them the scrollable pills row's intrinsic
+    // width blows the grid past narrow POS screens (1024px) → horizontal cut.
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       {/* items */}
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {menu.map((c) => (
             <button
@@ -182,7 +184,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
       </section>
 
       {/* order panel */}
-      <aside className="h-fit space-y-4 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-20">
+      <aside className="h-fit min-w-0 space-y-4 rounded-2xl border border-border bg-card p-4 lg:sticky lg:top-20">
         <h2 className="text-lg font-bold">الطلب الحالي</h2>
 
         {lines.length === 0 ? (
