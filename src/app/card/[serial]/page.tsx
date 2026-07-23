@@ -1,8 +1,15 @@
 import QRCode from "qrcode";
 import { getCardPublic } from "@/lib/cafe/loyalty-actions";
 import { PizzaraMark } from "@/components/cafe/Logo";
+import { InstallCardButton } from "@/components/cafe/InstallCardButton";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ serial: string }> }) {
+  const { serial } = await params;
+  // per-card manifest so "install" opens straight on this customer's card
+  return { title: "بطاقة بيزارا كافيه", manifest: `/card/${serial}/manifest.webmanifest` };
+}
 
 /** Public loyalty card — the customer's "wallet" page. Unguessable serial in the
  *  URL is the access key; shows points + a QR the cashier scans. */
@@ -48,9 +55,7 @@ export default async function CardPage({ params }: { params: Promise<{ serial: s
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={qr} alt="QR" className="mx-auto size-56 rounded-xl border border-border" />
           <p className="text-sm text-muted-foreground">اعرض هذا الرمز عند الكاشير لإضافة النقاط أو استبدال المكافآت.</p>
-          <p className="rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground">
-            💡 أضف هذه الصفحة إلى الشاشة الرئيسية لتكون بطاقتك دائماً معك.
-          </p>
+          <InstallCardButton />
         </div>
       </div>
     </main>

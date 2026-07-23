@@ -12,6 +12,16 @@ import {
 } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 
+/** Open WhatsApp with the customer's card link prefilled — lands the card in
+ *  their chat AND puts the cafe in their contacts for later marketing. */
+function sendCardWhatsApp(phone: string, serial: string) {
+  const digits = phone.replace(/\D/g, "");
+  const intl = digits.startsWith("964") ? digits : digits.replace(/^0/, "964");
+  const url = `${window.location.origin}/card/${serial}`;
+  const text = `مرحباً بك في بيزارا كافيه ☕\nهذه بطاقة الولاء الخاصة بك — احفظها لديك:\n${url}\n\nاجمع النقاط مع كل طلب واستبدلها بمكافآت مجانية 🎁`;
+  window.open(`https://wa.me/${intl}?text=${encodeURIComponent(text)}`, "_blank");
+}
+
 export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]; isAdmin: boolean }) {
   const router = useRouter();
 
@@ -19,7 +29,7 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [creating, setCreating] = useState(false);
-  const [createdSerial, setCreatedSerial] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ serial: string; phone: string } | null>(null);
   const [createErr, setCreateErr] = useState<string | null>(null);
 
   // find / adjust
@@ -33,14 +43,14 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
     e.preventDefault();
     setCreating(true);
     setCreateErr(null);
-    setCreatedSerial(null);
+    setCreated(null);
     const res = await createCard({ name, phone });
     setCreating(false);
     if (!res.ok) {
       setCreateErr(res.error);
       return;
     }
-    setCreatedSerial(res.serial);
+    setCreated({ serial: res.serial, phone: phone.trim() });
     setName("");
     setPhone("");
     router.refresh();
@@ -105,14 +115,24 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
             {creating ? "…" : "إنشاء البطاقة"}
           </button>
           {createErr && <p className="text-sm text-destructive">{createErr}</p>}
-          {createdSerial && (
-            <p className="rounded-lg bg-secondary p-3 text-sm">
-              تم الإنشاء — افتح البطاقة وشاركها مع الزبون:{" "}
-              <a href={`/card/${createdSerial}`} target="_blank" className="inline-flex items-center gap-1 font-semibold text-primary underline">
-                /card/{createdSerial}
-                <ExternalLink className="size-3.5" />
-              </a>
-            </p>
+          {created && (
+            <div className="space-y-2 rounded-lg bg-secondary p-3 text-sm">
+              <p>
+                تم الإنشاء — افتح البطاقة وشاركها مع الزبون:{" "}
+                <a href={`/card/${created.serial}`} target="_blank" className="inline-flex items-center gap-1 font-semibold text-primary underline">
+                  /card/{created.serial}
+                  <ExternalLink className="size-3.5" />
+                </a>
+              </p>
+              {created.phone && (
+                <button
+                  onClick={() => sendCardWhatsApp(created.phone, created.serial)}
+                  className="w-full rounded-lg bg-[#25D366] px-3 py-2 font-bold text-white transition hover:opacity-90"
+                >
+                  📲 إرسال البطاقة للزبون عبر واتساب
+                </button>
+              )}
+            </div>
           )}
         </form>
 
@@ -198,9 +218,19 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
                     </td>
                     <td className="px-4 py-2.5 font-bold text-primary">{c.points}</td>
                     <td className="px-4 py-2.5">
-                      <a href={`/card/${c.card_serial}`} target="_blank" className="text-primary underline">
-                        فتح
-                      </a>
+                      <div className="flex items-center gap-3">
+                        <a href={`/card/${c.card_serial}`} target="_blank" className="text-primary underline">
+                          فتح
+                        </a>
+                        {c.phone && (
+                          <button
+                            onClick={() => sendCardWhatsApp(c.phone!, c.card_serial)}
+                            className="rounded-md bg-[#25D366] px-2 py-1 text-xs font-bold text-white hover:opacity-90"
+                          >
+                            واتساب
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
