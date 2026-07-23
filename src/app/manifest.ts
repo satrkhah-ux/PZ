@@ -5,6 +5,7 @@ import type { MetadataRoute } from "next";
 // public — src/proxy.ts's matcher excludes it from the auth gate.
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/menu",
     name: "بيزارا كافيه — Pizzara",
     short_name: "بيزارا كافيه",
     description: "منيو وطلبات وولاء بيزارا كافيه",

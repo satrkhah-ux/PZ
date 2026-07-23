@@ -6,6 +6,10 @@ import { StaffShell } from "@/components/cafe/StaffShell";
 // Auth + role are resolved per request (runtime env, session cookie).
 export const dynamic = "force-dynamic";
 
+// Staff screens install as the separate «إدارة بيزارا» PWA (admin badge icon,
+// opens on the dashboard) instead of the customer menu app.
+export const metadata = { manifest: "/admin-manifest.webmanifest" };
+
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
   const pushKey = process.env.WEB_PUSH_PUBLIC_KEY ?? null;
   if (isDemoServer()) {
