@@ -31,7 +31,6 @@ export function IncomingOrdersClient() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of persisted device settings
     setAutoPrint(localStorage.getItem("pz-autoprint") === "1");
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of persisted device settings
     setDrawerKick(localStorage.getItem("pz-drawer") === "1");
   }, []);
   useEffect(() => {
