@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { addExpense, saveRegisterClosure, type ExpenseRow, type RegisterClosure } from "@/lib/cafe/expense-actions";
 import { formatIqdLabel } from "@/lib/cafe/money";
 
-const CATEGORIES = ["مشتريات", "رواتب", "إيجار", "كهرباء وماء", "صيانة", "أخرى"];
+// recurring monthly bills — tap a chip to prefill the category
+const MONTHLY = ["الإيجار", "الكهرباء", "المولد", "المياه"];
+const CATEGORIES = ["مشتريات", "رواتب", ...MONTHLY, "صيانة", "أخرى"];
 
 export function ExpensesClient({
   expenses,
@@ -54,14 +56,39 @@ export function ExpensesClient({
     router.refresh();
   }
 
+  function quickMonthly(cat: string) {
+    setCategory(cat);
+    document.getElementById("expense-amount")?.focus();
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">المصروفات</h1>
+
+      {/* monthly recurring bills — quick prefill */}
+      <div className="space-y-2 rounded-2xl border border-border bg-card p-4">
+        <h2 className="text-sm font-bold">🗓️ المصروفات الشهرية</h2>
+        <div className="flex flex-wrap gap-2">
+          {MONTHLY.map((c) => (
+            <button
+              key={c}
+              onClick={() => quickMonthly(c)}
+              className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
+                category === c ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-secondary"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">اضغط الصنف ثم أدخل المبلغ في نموذج المصروف بالأسفل.</p>
+      </div>
 
       <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[160px_180px_1fr_auto]">
         <label className="space-y-1 text-sm">
           <span className="text-muted-foreground">المبلغ (د.ع)</span>
           <input
+            id="expense-amount"
             type="number"
             min={1}
             required
