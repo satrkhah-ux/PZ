@@ -7,13 +7,32 @@ import { requireStaff, requireAdmin } from "./auth";
 import { loyaltyConfig } from "./config";
 
 export type Card = { id: string; name_ar: string | null; points: number };
+export type FoundCard = Card & { serial: string };
 
-/** Look up a customer's card by its serial (from a scanned QR or manual entry). */
-export async function findCard(serial: string): Promise<Card | null> {
+/** Look up a card by its serial (scanned QR / manual entry) OR by the
+ *  customer's phone number — all-digit queries are treated as phones. */
+export async function findCard(query: string): Promise<FoundCard | null> {
   await requireStaff();
+  const q = query.trim().replace(/\s/g, "");
+  if (!q) return null;
+  if (/^\d{6,}$/.test(q)) {
+    // phone path: customers has no authenticated grants → service client after the staff gate
+    const svc = createSupabaseServiceClient();
+    const { data } = await svc.from("customers").select("id, name_ar, points, card_serial").eq("phone", q).limit(1);
+    const c = data?.[0];
+    return c ? { id: c.id, name_ar: c.name_ar, points: c.points, serial: c.card_serial } : null;
+  }
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.rpc("get_card", { p_serial: serial.trim() });
-  return data?.[0] ?? null;
+  const { data } = await supabase.rpc("get_card", { p_serial: q });
+  return data?.[0] ? { ...data[0], serial: q } : null;
+}
+
+/** Card count — no PII, visible to every staff member. */
+export async function countCustomers(): Promise<number> {
+  await requireStaff();
+  const svc = createSupabaseServiceClient();
+  const { count } = await svc.from("customers").select("id", { count: "exact", head: true });
+  return count ?? 0;
 }
 
 /** Create (or return existing by phone) a loyalty card; returns its serial. */

@@ -2,6 +2,7 @@
 
 import { isDemoServer } from "./demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { sendNewOrderPush } from "./push";
 import type { Json } from "@/lib/types";
 
 export type OrderLineInput = {
@@ -59,6 +60,12 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
     p_table: input.table?.trim() || null,
   });
   if (error || !data?.[0]) return { ok: false, error: "تعذّر إرسال الطلب، حاول مجدداً." };
+  // alert subscribed staff devices even when the app is closed (never throws)
+  await sendNewOrderPush({
+    seq: data[0].order_seq,
+    table: input.table?.trim() || null,
+    count: input.lines.reduce((s, l) => s + l.qty, 0),
+  });
   return { ok: true, orderNumber: String(data[0].order_seq).padStart(3, "0"), orderId: data[0].order_id, cardSerial };
 }
 

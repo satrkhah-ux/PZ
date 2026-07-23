@@ -223,7 +223,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
               <input
                 value={serialInput}
                 onChange={(e) => setSerialInput(e.target.value)}
-                placeholder="رقم البطاقة"
+                placeholder="رقم البطاقة أو الهاتف"
                 dir="ltr"
                 className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
               />

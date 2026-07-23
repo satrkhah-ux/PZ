@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      push_subscriptions: {
+        Row: Timestamped & { endpoint: string; p256dh: string; auth: string };
+        Insert: { id?: string; endpoint: string; p256dh: string; auth: string; created_at?: string };
+        Update: Partial<{ endpoint: string; p256dh: string; auth: string }>;
+        Relationships: [];
+      };
       order_counters: {
         Row: { business_day: string; last_seq: number };
         Insert: { business_day: string; last_seq?: number };

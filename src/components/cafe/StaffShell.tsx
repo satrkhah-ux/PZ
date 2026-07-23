@@ -3,11 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BellRing, LogOut } from "lucide-react";
+import { Bell, BellOff, BellRing, LogOut } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
+import { savePushSubscription, removePushSubscription } from "@/lib/cafe/push-actions";
 import { PizzaraMark } from "./Logo";
+
+function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
 
 /** two-tone chime for a new incoming order (WebAudio — no asset needed) */
 function chime() {
@@ -45,10 +54,12 @@ const NAV: { href: string; label: string; adminOnly: boolean }[] = [
 export function StaffShell({
   role,
   name,
+  pushKey = null,
   children,
 }: {
   role: StaffRole | null;
   name: string;
+  pushKey?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -100,6 +111,44 @@ export function StaffShell({
     };
   }, []);
 
+  // Web Push: notifications that reach the device even with the app closed.
+  const [pushState, setPushState] = useState<"unsupported" | "off" | "on" | "denied">("unsupported");
+  useEffect(() => {
+    if (!pushKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then(async (reg) => {
+        const sub = await reg.pushManager.getSubscription();
+        setPushState(sub ? "on" : Notification.permission === "denied" ? "denied" : "off");
+      })
+      .catch(() => {});
+  }, [pushKey]);
+  async function togglePush() {
+    if (!pushKey) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) {
+        await existing.unsubscribe();
+        await removePushSubscription(existing.endpoint);
+        setPushState("off");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if (perm !== "granted") {
+        setPushState(perm === "denied" ? "denied" : "off");
+        return;
+      }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pushKey) });
+      const j = sub.toJSON();
+      if (!j.keys?.p256dh || !j.keys?.auth) return;
+      await savePushSubscription({ endpoint: sub.endpoint, keys: { p256dh: j.keys.p256dh, auth: j.keys.auth } });
+      setPushState("on");
+    } catch {
+      /* unsupported browser / user dismissed */
+    }
+  }
+
   async function signOut() {
     try {
       await createSupabaseBrowserClient().auth.signOut();
@@ -140,6 +189,24 @@ export function StaffShell({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:inline">{name}</span>
+            {pushState !== "unsupported" && (
+              <button
+                onClick={togglePush}
+                aria-label="إشعارات الطلبات"
+                title={
+                  pushState === "on"
+                    ? "الإشعارات مفعّلة — تصل حتى والتطبيق مغلق"
+                    : pushState === "denied"
+                      ? "الإشعارات محظورة — فعّلها من إعدادات الموقع في المتصفح"
+                      : "تفعيل إشعارات الطلبات (تصل حتى والتطبيق مغلق)"
+                }
+                className={`rounded-lg border p-2 transition ${
+                  pushState === "on" ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-secondary"
+                }`}
+              >
+                {pushState === "on" ? <Bell className="size-4" /> : <BellOff className="size-4" />}
+              </button>
+            )}
             <button onClick={signOut} aria-label="تسجيل الخروج" className="rounded-lg border border-border p-2 hover:bg-secondary">
               <LogOut className="size-4" />
             </button>

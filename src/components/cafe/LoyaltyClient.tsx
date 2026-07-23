@@ -7,7 +7,7 @@ import {
   createCard,
   findCard,
   adjustPoints,
-  type Card,
+  type FoundCard,
   type CustomerRow,
 } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
@@ -22,7 +22,7 @@ function sendCardWhatsApp(phone: string, serial: string) {
   window.open(`https://wa.me/${intl}?text=${encodeURIComponent(text)}`, "_blank");
 }
 
-export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]; isAdmin: boolean }) {
+export function LoyaltyClient({ customers, isAdmin, customerCount }: { customers: CustomerRow[]; isAdmin: boolean; customerCount: number }) {
   const router = useRouter();
 
   // create card
@@ -35,7 +35,7 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
   // find / adjust
   const [serialInput, setSerialInput] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
-  const [found, setFound] = useState<(Card & { serial: string }) | null>(null);
+  const [found, setFound] = useState<FoundCard | null>(null);
   const [delta, setDelta] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -62,11 +62,11 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
     setMsg(null);
     const card = await findCard(s);
     if (!card) {
-      setMsg("بطاقة غير موجودة.");
+      setMsg("لا توجد بطاقة بهذا الرقم — تأكد من الرقم أو أنشئ بطاقة جديدة.");
       setFound(null);
       return;
     }
-    setFound({ ...card, serial: s });
+    setFound(card);
   }
 
   const onScanned = useCallback((text: string) => {
@@ -95,7 +95,10 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">الولاء</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-bold">الولاء</h1>
+        <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">البطاقات: {customerCount}</span>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* create card */}
@@ -143,7 +146,7 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
             <input
               value={serialInput}
               onChange={(e) => setSerialInput(e.target.value)}
-              placeholder="رقم البطاقة"
+              placeholder="رقم البطاقة أو رقم الهاتف"
               dir="ltr"
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
@@ -158,6 +161,13 @@ export function LoyaltyClient({ customers, isAdmin }: { customers: CustomerRow[]
             <div className="space-y-2 rounded-lg bg-secondary/60 p-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{found.name_ar ?? "زبون"}</span>
+                <button
+                  onClick={() => sendCardWhatsApp(serialInput.trim().replace(/\s/g, ""), found.serial)}
+                  className="rounded-md bg-[#25D366] px-2 py-1 text-xs font-bold text-white hover:opacity-90"
+                  hidden={!/^\d{6,}$/.test(serialInput.trim().replace(/\s/g, ""))}
+                >
+                  واتساب
+                </button>
                 <span>
                   الرصيد: <b>{found.points}</b> نقطة
                 </span>

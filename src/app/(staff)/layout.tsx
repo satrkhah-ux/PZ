@@ -7,10 +7,11 @@ import { StaffShell } from "@/components/cafe/StaffShell";
 export const dynamic = "force-dynamic";
 
 export default async function StaffLayout({ children }: { children: React.ReactNode }) {
+  const pushKey = process.env.WEB_PUSH_PUBLIC_KEY ?? null;
   if (isDemoServer()) {
     // Demo trial (no Supabase configured): browsable shell, no real data.
     return (
-      <StaffShell role="admin" name="وضع تجريبي">
+      <StaffShell role="admin" name="وضع تجريبي" pushKey={pushKey}>
         {children}
       </StaffShell>
     );
@@ -18,7 +19,7 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   const staff = await getStaff();
   if (!staff) redirect("/sign-in");
   return (
-    <StaffShell role={staff.role} name={staff.name}>
+    <StaffShell role={staff.role} name={staff.name} pushKey={pushKey}>
       {children}
     </StaffShell>
   );
