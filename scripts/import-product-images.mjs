@@ -27,8 +27,11 @@ loadEnv();
 
 // --staging: upload to products-v2/ WITHOUT touching the live menu (preview at
 // /menu/modern?preview=v2). Approve later by re-running WITHOUT --staging.
+// --only=NN: import a single numbered image (e.g. a newly added product) without
+// touching the rest.
 const args = process.argv.slice(2);
 const STAGING = args.includes("--staging");
+const ONLY = args.find((a) => a.startsWith("--only="))?.slice(7) ?? null;
 const SRC = args.find((a) => !a.startsWith("--")) ?? "C:/Users/al3r1/Documents/Codex/2026-07-22/referenced-chatgpt-conversation-this-is-untrusted/outputs/PZ-All-Products";
 
 // image number (01-36) → exact menu_items.name_ar
@@ -43,6 +46,7 @@ const MAP = {
   "28": "سموذي فراولة", "29": "سموذي أناناس", "30": "سموذي مانجو", "31": "سموذي رمان",
   "32": "فرابيه كراميل", "33": "فرابيه فانيلا",
   "34": "كرواسون", "35": "دونات", "36": "كوكيز",
+  "37": "قهوة متخصصة V60",
 };
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -51,6 +55,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 let ok = 0, missing = 0, failed = 0;
 for (const [num, name] of Object.entries(MAP)) {
+  if (ONLY && num !== ONLY.padStart(2, "0")) continue;
   // designer set first (clean), current promo set as fallback
   const candidates = [`PZ-Item-${num}.png`, `PZ-Product-${num}.png`, `PZ-Item-${num}.jpg`, `PZ-Product-${num}.jpg`];
   const file = candidates.map((f) => join(SRC, f)).find(existsSync);
