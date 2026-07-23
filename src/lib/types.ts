@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      monthly_costs: {
+        Row: { category: string; amount: number; updated_at: string };
+        Insert: { category: string; amount?: number; updated_at?: string };
+        Update: Partial<{ amount: number; updated_at: string }>;
+        Relationships: [];
+      };
       register_closures: {
         Row: { business_day: string; remaining: number; note: string | null; closed_by: string | null; created_at: string; updated_at: string };
         Insert: { business_day: string; remaining: number; note?: string | null; closed_by?: string | null; created_at?: string; updated_at?: string };

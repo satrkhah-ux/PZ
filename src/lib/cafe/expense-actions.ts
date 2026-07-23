@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireStaff } from "./auth";
+import { requireStaff, requireAdmin } from "./auth";
 import { businessDay } from "./time";
 
 export type ExpenseRow = {
@@ -70,6 +70,30 @@ export async function saveRegisterClosure(input: { remaining: number; note?: str
   );
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/expenses");
+  return { ok: true as const };
+}
+
+// ── fixed monthly costs (الإيجار/الكهرباء/المولد/المياه) ────────────────────
+
+export type MonthlyCost = { category: string; amount: number };
+
+/** The fixed monthly-cost baseline. Any staff can view (feeds the summary). */
+export async function getMonthlyCosts(): Promise<MonthlyCost[]> {
+  await requireStaff();
+  const svc = createSupabaseServiceClient();
+  const { data } = await svc.from("monthly_costs").select("category, amount");
+  return (data ?? []) as MonthlyCost[];
+}
+
+/** Set the fixed monthly amounts (admin only — it changes the profit math). */
+export async function saveMonthlyCosts(items: MonthlyCost[]) {
+  await requireAdmin();
+  const svc = createSupabaseServiceClient();
+  const rows = items.map((i) => ({ category: i.category, amount: Math.max(0, Math.round(i.amount || 0)), updated_at: new Date().toISOString() }));
+  const { error } = await svc.from("monthly_costs").upsert(rows, { onConflict: "category" });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/expenses");
+  revalidatePath("/dashboard");
   return { ok: true as const };
 }
 

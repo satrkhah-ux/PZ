@@ -27,10 +27,12 @@ export function DashboardClient({
   days,
   summary,
   recent,
+  monthlyCosts,
 }: {
   days: number;
   summary: DaySummary[];
   recent: RecentOrder[];
+  monthlyCosts: number;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const today = summary[summary.length - 1];
@@ -121,6 +123,22 @@ export function DashboardClient({
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            </section>
+          )}
+
+          {/* monthly summary incl. fixed monthly costs */}
+          {days === 30 && (
+            <section className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">الملخص الشهري (بعد المصاريف الثابتة)</h2>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Kpi label="أرباح التشغيل" value={formatIqdLabel(totals.profit)} />
+                <Kpi label="المصاريف المتغيرة" value={formatIqdLabel(totals.expenses)} />
+                <Kpi label="المصاريف الشهرية الثابتة" value={formatIqdLabel(monthlyCosts)} />
+                <Kpi label="الصافي بعد الثابتة" value={formatIqdLabel(totals.net - monthlyCosts)} highlight />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                الصافي بعد الثابتة = الأرباح − المصاريف المتغيرة − المصاريف الشهرية الثابتة (الإيجار والكهرباء والمولد والمياه). تُضبط الثابتة من صفحة المصروفات.
+              </p>
             </section>
           )}
 

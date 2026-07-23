@@ -2,20 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addExpense, saveRegisterClosure, type ExpenseRow, type RegisterClosure } from "@/lib/cafe/expense-actions";
+import {
+  addExpense,
+  saveRegisterClosure,
+  saveMonthlyCosts,
+  type ExpenseRow,
+  type RegisterClosure,
+  type MonthlyCost,
+} from "@/lib/cafe/expense-actions";
 import { formatIqdLabel } from "@/lib/cafe/money";
 
-// recurring monthly bills — tap a chip to prefill the category
+// fixed monthly bills — a persistent baseline, set once, subtracted monthly
 const MONTHLY = ["الإيجار", "الكهرباء", "المولد", "المياه"];
 const CATEGORIES = ["مشتريات", "رواتب", ...MONTHLY, "صيانة", "أخرى"];
 
 export function ExpensesClient({
   expenses,
   closures,
+  monthlyCosts,
   isAdmin,
 }: {
   expenses: ExpenseRow[];
   closures: { today: RegisterClosure | null; previous: RegisterClosure | null };
+  monthlyCosts: MonthlyCost[];
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -24,6 +33,22 @@ export function ExpensesClient({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // fixed monthly costs editor (admin)
+  const initialCosts = Object.fromEntries(MONTHLY.map((c) => [c, String(monthlyCosts.find((m) => m.category === c)?.amount ?? 0)]));
+  const [costs, setCosts] = useState<Record<string, string>>(initialCosts);
+  const [costBusy, setCostBusy] = useState(false);
+  const [costMsg, setCostMsg] = useState<string | null>(null);
+  const fixedTotal = MONTHLY.reduce((s, c) => s + (Number(costs[c]) || 0), 0);
+
+  async function saveCosts() {
+    setCostBusy(true);
+    setCostMsg(null);
+    const res = await saveMonthlyCosts(MONTHLY.map((c) => ({ category: c, amount: Number(costs[c]) || 0 })));
+    setCostBusy(false);
+    setCostMsg(res.ok ? "تم حفظ المصاريف الشهرية الثابتة ✅" : res.error);
+    if (res.ok) router.refresh();
+  }
 
   // إغلاق الصندوق — remaining cash kept in the drawer at day end
   const [remaining, setRemaining] = useState(closures.today ? String(closures.today.remaining) : "");
@@ -56,33 +81,47 @@ export function ExpensesClient({
     router.refresh();
   }
 
-  function quickMonthly(cat: string) {
-    setCategory(cat);
-    document.getElementById("expense-amount")?.focus();
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">المصروفات</h1>
 
-      {/* monthly recurring bills — quick prefill */}
-      <div className="space-y-2 rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-bold">🗓️ المصروفات الشهرية</h2>
-        <div className="flex flex-wrap gap-2">
-          {MONTHLY.map((c) => (
+      {/* fixed monthly costs baseline (admin) */}
+      {isAdmin && (
+        <div className="space-y-3 rounded-2xl border-2 border-primary/30 bg-card p-4">
+          <h2 className="font-bold">🗓️ المصاريف الشهرية الثابتة</h2>
+          <p className="text-xs text-muted-foreground">
+            تُضبط مرة كقاعدة أساسية، وتُحسم تلقائياً من صافي الربح الشهري في لوحة التحكم (عرض ٣٠ يوماً).
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {MONTHLY.map((c) => (
+              <label key={c} className="space-y-1 text-sm">
+                <span className="text-muted-foreground">{c} (د.ع)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={costs[c] ?? ""}
+                  onChange={(e) => setCosts((p) => ({ ...p, [c]: e.target.value }))}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
+                  dir="ltr"
+                />
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold">
+              إجمالي الثابتة شهرياً: <span className="text-primary">{formatIqdLabel(fixedTotal)}</span>
+            </span>
             <button
-              key={c}
-              onClick={() => quickMonthly(c)}
-              className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
-                category === c ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-secondary"
-              }`}
+              onClick={saveCosts}
+              disabled={costBusy}
+              className="rounded-lg bg-primary px-5 py-2 font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
             >
-              {c}
+              {costBusy ? "…" : "حفظ المصاريف الثابتة"}
             </button>
-          ))}
+          </div>
+          {costMsg && <p className="text-sm text-muted-foreground">{costMsg}</p>}
         </div>
-        <p className="text-xs text-muted-foreground">اضغط الصنف ثم أدخل المبلغ في نموذج المصروف بالأسفل.</p>
-      </div>
+      )}
 
       <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[160px_180px_1fr_auto]">
         <label className="space-y-1 text-sm">
