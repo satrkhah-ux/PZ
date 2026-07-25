@@ -50,6 +50,14 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
+    // Root routing lives HERE (not in next.config) so it can see the session:
+    // signed-in staff → dashboard (handled above); everyone else on a MODERN_ONLY
+    // deployment → the customer menu. In next.config this ran BEFORE the proxy and
+    // sent even logged-in staff to /menu.
+    if (pathname === "/" && process.env.MODERN_ONLY === "1") {
+      return NextResponse.redirect(new URL("/menu", request.url));
+    }
+
     if (!isAuthed && !isPublic(pathname)) {
       const redirectUrl = new URL("/sign-in", request.url);
       redirectUrl.searchParams.set("redirect", pathname);

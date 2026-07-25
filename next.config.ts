@@ -9,13 +9,9 @@ const isManagedHost =
 const nextConfig: NextConfig = {
   ...(isManagedHost ? {} : { output: "standalone" }),
   devIndicators: false,
-  // MODERN_ONLY=1 turns a deployment into a dedicated menu site: its root goes
-  // straight to the menu (the modern one — /menu is now the interactive default).
-  async redirects() {
-    return process.env.MODERN_ONLY === "1"
-      ? [{ source: "/", destination: "/menu", permanent: false }]
-      : [];
-  },
+  // Root routing for MODERN_ONLY moved to src/proxy.ts so it can see the session
+  // (config redirects run before the proxy and would send logged-in staff who
+  // open the bare domain to /menu instead of their dashboard).
   // /img/* → storage (same path the netlify.toml edge proxy serves in prod);
   // this rewrite covers local dev and any Node host.
   async rewrites() {
