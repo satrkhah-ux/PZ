@@ -14,8 +14,10 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
+  Moon,
   MoreHorizontal,
   QrCode,
+  Sun,
   UtensilsCrossed,
   Users,
   Wallet,
@@ -23,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useCafeUI } from "@/components/CafeUIProvider";
 import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
 import { savePushSubscription, removePushSubscription } from "@/lib/cafe/push-actions";
@@ -95,6 +98,7 @@ export function StaffShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { setTheme } = useCafeUI();
   const links = NAV.filter((n) => !n.adminOnly || role === "admin");
   const bottomTabs = links.filter((l) => l.href !== "/help").slice(0, 4); // first 4 as bottom tabs, rest in «المزيد»
   const [moreOpen, setMoreOpen] = useState(false);
@@ -236,6 +240,15 @@ export function StaffShell({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span className="hidden text-sm text-muted-foreground sm:inline">{name}</span>
+            <button
+              onClick={() => setTheme(document.documentElement.classList.contains("dark") ? "Light" : "Dark")}
+              aria-label="المظهر الليلي/النهاري"
+              title="تبديل المظهر الليلي/النهاري"
+              className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-secondary"
+            >
+              <Sun className="hidden size-4 dark:block" />
+              <Moon className="size-4 dark:hidden" />
+            </button>
             <button
               onClick={chime}
               aria-label="تجربة صوت التنبيه"
