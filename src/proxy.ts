@@ -39,8 +39,14 @@ export function proxy(request: NextRequest) {
 
     const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);
     const isAuthed = session !== null;
+    // A cookie can be present but its access token expired. getServerUser rejects
+    // an expired token, so the app redirects to /sign-in — we must NOT bounce
+    // /sign-in straight back to /dashboard here, or the two loop forever and the
+    // browser never gets to refresh the token. Only skip the login page when the
+    // token is still fresh.
+    const expired = session?.expiresAt != null && session.expiresAt * 1000 < Date.now();
 
-    if (isAuthed && LOGIN_PATHS.has(pathname)) {
+    if (isAuthed && !expired && LOGIN_PATHS.has(pathname)) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
 
