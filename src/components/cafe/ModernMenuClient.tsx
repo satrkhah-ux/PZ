@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
+import { Check, LogIn, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { getMyOrders, submitOrder, type OrderLineInput, type PublicOrder } from "@/lib/cafe/order-actions";
@@ -206,6 +206,15 @@ export function ModernMenuClient({
                   كلاسيكي
                 </Link>
               </div>
+              <Link
+                href="/sign-in"
+                aria-label="دخول الموظفين"
+                title="دخول الموظفين"
+                className="flex items-center gap-1 rounded-full border border-[#d18b4a]/40 px-3 py-1.5 text-xs font-bold text-[#d18b4a] transition hover:bg-[#d18b4a]/10"
+              >
+                <LogIn className="size-3.5" />
+                دخول الموظفين
+              </Link>
             </div>
           </div>
           {/* categories */}
