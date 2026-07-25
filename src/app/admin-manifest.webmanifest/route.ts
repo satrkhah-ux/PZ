@@ -11,7 +11,9 @@ export function GET() {
       name: "إدارة بيزارا كافيه",
       short_name: "إدارة بيزارا",
       description: "لوحة إدارة بيزارا كافيه — الطلبات والطاولات والتقارير",
-      start_url: "/dashboard",
+      // start at the root: the proxy sends signed-in staff to the dashboard.
+      // Robust even if iOS picks the customer manifest for a same-scope PWA.
+      start_url: "/",
       scope: "/",
       display: "standalone",
       dir: "rtl",

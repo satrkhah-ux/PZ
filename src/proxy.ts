@@ -51,10 +51,17 @@ export function proxy(request: NextRequest) {
     }
 
     // Root routing lives HERE (not in next.config) so it can see the session:
-    // signed-in staff → dashboard (handled above); everyone else on a MODERN_ONLY
-    // deployment → the customer menu. In next.config this ran BEFORE the proxy and
-    // sent even logged-in staff to /menu.
+    // fresh staff session → /dashboard (handled above). An EXPIRED staff cookie →
+    // re-login then land on the dashboard (so the installed admin app recovers
+    // without dumping them on the customer menu). No session at all (a customer)
+    // → the menu. In next.config this ran BEFORE the proxy and always sent even
+    // logged-in staff to /menu.
     if (pathname === "/" && process.env.MODERN_ONLY === "1") {
+      if (isAuthed && expired) {
+        const u = new URL("/sign-in", request.url);
+        u.searchParams.set("redirect", "/dashboard");
+        return NextResponse.redirect(u);
+      }
       return NextResponse.redirect(new URL("/menu", request.url));
     }
 

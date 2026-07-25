@@ -9,7 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "بيزارا كافيه — Pizzara",
     short_name: "بيزارا كافيه",
     description: "منيو وطلبات وولاء بيزارا كافيه",
-    start_url: "/menu",
+    // start at the root: the proxy routes it by session — customers → /menu,
+    // signed-in staff → dashboard. Robust even if iOS confuses the two PWAs.
+    start_url: "/",
     display: "standalone",
     dir: "rtl",
     lang: "ar",
