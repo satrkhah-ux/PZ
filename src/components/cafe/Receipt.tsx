@@ -5,6 +5,8 @@ export type ReceiptData = {
   lines: { name: string; flavor?: string | null; qty: number; unitPrice: number }[];
   subtotal: number;
   discount: number;
+  /** itemized surcharges (extra shot, syrup…) */
+  extras?: { name: string; price: number }[];
   total: number;
   dateTime: string;
   /** table number for incoming self-order tickets */
@@ -59,6 +61,17 @@ export function Receipt({ data }: { data: ReceiptData }) {
         <span>المجموع</span>
         <span>{formatIqd(data.subtotal)} د.ع</span>
       </div>
+      {data.extras && data.extras.length > 0 && (
+        <>
+          <div style={{ fontSize: "12px", fontWeight: 700, marginTop: "2px" }}>إضافات:</div>
+          {data.extras.map((x, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+              <span>+ {x.name}</span>
+              <span>{formatIqd(x.price)} د.ع</span>
+            </div>
+          ))}
+        </>
+      )}
       {data.discount > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
           <span>الخصم</span>

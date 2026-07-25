@@ -65,6 +65,10 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const [orderType, setOrderType] = useState<"takeaway" | "dinein">("takeaway");
   const [tableNo, setTableNo] = useState("");
   const [orderNote, setOrderNote] = useState("");
+  // itemized surcharges for add-ons the customer requests (extra shot, syrup…)
+  const [extras, setExtras] = useState<{ name: string; price: number }[]>([]);
+  const [extraName, setExtraName] = useState("");
+  const [extraPrice, setExtraPrice] = useState("");
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
@@ -79,7 +83,17 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
 
   const lines = Object.values(cart);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
-  const total = Math.max(0, subtotal - discount);
+  const extraTotal = useMemo(() => extras.reduce((s, x) => s + x.price, 0), [extras]);
+  const total = Math.max(0, subtotal - discount + extraTotal);
+
+  function addExtra() {
+    const name = extraName.trim();
+    const price = Math.max(0, Math.round(Number(extraPrice) || 0));
+    if (!name || price <= 0) return;
+    setExtras((xs) => [...xs, { name, price }]);
+    setExtraName("");
+    setExtraPrice("");
+  }
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
 
   async function lookup(serial: string) {
@@ -123,8 +137,9 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     setBusy(true);
     setErr(null);
     const table = orderType === "dinein" ? tableNo : null;
+    const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
     const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-    const res = await cashierCheckout({ lines: payload, discount, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+    const res = await cashierCheckout({ lines: payload, discount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
     setBusy(false);
     if (!res.ok) {
       setErr(res.error);
@@ -137,6 +152,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
       subtotal,
       discount,
+      extras,
       total,
       dateTime: new Date().toLocaleString("en-GB", {
         timeZone: "Asia/Baghdad",
@@ -152,6 +168,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     dispatch({ type: "clear" });
     setCustomer(null);
     setDiscount(0);
+    setExtras([]);
     setSerialInput("");
     setPayMethod("cash");
     setOrderType("takeaway");
@@ -254,12 +271,59 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
           {loyaltyMsg && <p className="text-xs text-muted-foreground">{loyaltyMsg}</p>}
         </div>
 
+        {/* إضافات (surcharges for add-ons) */}
+        <div className="space-y-2 rounded-xl bg-secondary/60 p-3">
+          <p className="text-sm font-semibold">➕ إضافات على الطلب</p>
+          {extras.length > 0 && (
+            <ul className="space-y-1">
+              {extras.map((x, i) => (
+                <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0 truncate">{x.name}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-primary">+{formatIqdLabel(x.price)}</span>
+                    <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} aria-label="حذف" className="rounded-md border border-border p-1 hover:bg-background">
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-1.5">
+            <input
+              value={extraName}
+              onChange={(e) => setExtraName(e.target.value)}
+              placeholder="نوع الإضافة (شوت، كراميل…)"
+              className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            <input
+              type="number"
+              min={0}
+              value={extraPrice}
+              onChange={(e) => setExtraPrice(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addExtra()}
+              placeholder="السعر"
+              dir="ltr"
+              className="w-20 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            <button onClick={addExtra} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
+              +
+            </button>
+          </div>
+        </div>
+
         {/* totals */}
         <div className="space-y-1.5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">المجموع</span>
             <span>{formatIqdLabel(subtotal)}</span>
           </div>
+          {extraTotal > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">الإضافات</span>
+              <span className="text-primary">+{formatIqdLabel(extraTotal)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-muted-foreground">الخصم</span>
             <input

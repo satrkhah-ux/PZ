@@ -61,11 +61,14 @@ async function payOrder(
   orderId: string,
   discount: number,
   customerId: string | null,
+  extra = 0,
+  extraNote: string | null = null,
 ): Promise<{ ok: true; total: number; awarded: number } | { ok: false; error: string }> {
   const { data: ord } = await supabase.from("orders").select("subtotal, customer_id").eq("id", orderId).maybeSingle();
   const subtotal = ord?.subtotal ?? 0;
   const disc = Math.max(0, Math.round(discount));
-  const net = Math.max(0, subtotal - disc);
+  const ext = Math.max(0, Math.round(extra));
+  const net = Math.max(0, subtotal - disc + ext);
   const cfg = loyaltyConfig();
   // award points to whoever the order belongs to — the customer attached at the
   // counter OR the one the self-order already carries (phone entered on the menu)
@@ -76,6 +79,8 @@ async function payOrder(
     p_discount: disc,
     p_customer: customerId,
     p_award_points: award,
+    p_extra: ext,
+    p_extra_note: extraNote?.trim() || null,
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true, total: net, awarded: award };
@@ -90,6 +95,8 @@ export type CheckoutResult =
 export async function cashierCheckout(input: {
   lines: OrderLineInput[];
   discount?: number;
+  extra?: number;
+  extraNote?: string | null;
   customerId?: string | null;
   table?: string | null;
   note?: string | null;
@@ -107,7 +114,7 @@ export async function cashierCheckout(input: {
   });
   if (error || !placed?.[0]) return { ok: false, error: error?.message ?? "تعذّر إنشاء الطلب." };
 
-  const paid = await payOrder(supabase, placed[0].order_id, input.discount ?? 0, input.customerId ?? null);
+  const paid = await payOrder(supabase, placed[0].order_id, input.discount ?? 0, input.customerId ?? null, input.extra ?? 0, input.extraNote ?? null);
   if (!paid.ok) return paid;
 
   revalidatePath("/cashier");

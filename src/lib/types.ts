@@ -112,15 +112,17 @@ export type Database = {
       orders: {
         Row: Timestamped & {
           business_day: string; order_seq: number; channel: OrderChannel; status: OrderStatus;
-          subtotal: number; cost_total: number; discount: number; table_no: string | null; note: string | null;
+          subtotal: number; cost_total: number; discount: number; extra: number; extra_note: string | null;
+          table_no: string | null; note: string | null;
           customer_id: string | null; cashier_id: string | null; paid_at: string | null;
         };
         Insert: {
           id?: string; business_day?: string; order_seq: number; channel: OrderChannel; status?: OrderStatus;
-          subtotal?: number; cost_total?: number; discount?: number; table_no?: string | null; note?: string | null;
+          subtotal?: number; cost_total?: number; discount?: number; extra?: number; extra_note?: string | null;
+          table_no?: string | null; note?: string | null;
           customer_id?: string | null; cashier_id?: string | null; paid_at?: string | null; created_at?: string;
         };
-        Update: Partial<{ status: OrderStatus; discount: number; customer_id: string | null; paid_at: string | null }>;
+        Update: Partial<{ status: OrderStatus; discount: number; extra: number; extra_note: string | null; customer_id: string | null; paid_at: string | null }>;
         Relationships: [];
       };
       order_items: {
@@ -172,7 +174,7 @@ export type Database = {
         Returns: { order_id: string; order_seq: number }[];
       };
       mark_order_paid: {
-        Args: { p_order: string; p_discount?: number; p_customer?: string | null; p_award_points?: number };
+        Args: { p_order: string; p_discount?: number; p_customer?: string | null; p_award_points?: number; p_extra?: number; p_extra_note?: string | null };
         Returns: number;
       };
       cancel_order: { Args: { p_order: string }; Returns: undefined };

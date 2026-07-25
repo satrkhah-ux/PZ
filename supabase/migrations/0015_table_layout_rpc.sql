@@ -8,7 +8,7 @@
 create or replace function public.save_cafe_tables(p_tables jsonb)
 returns void language plpgsql security definer set search_path = public as $$
 begin
-  delete from cafe_tables;
+  delete from cafe_tables where true;  -- explicit WHERE: pooler blocks unqualified DELETE
   insert into cafe_tables(name, kind, active, pos_x, pos_y, sort)
   select distinct on (trim(x->>'name'))
     trim(x->>'name'),
