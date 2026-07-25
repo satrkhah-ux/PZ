@@ -36,6 +36,11 @@ describe("deriveTableStatuses", () => {
     expect(res[2].seq).toBe(8);
   });
 
+  it("carries the guest estimate (item count) onto the busy table", () => {
+    const [t1] = deriveTableStatuses([row({ status: "pending", table_no: "1", created_at: min(2), guests: 3 })], NOW, ["1"]);
+    expect(t1.guests).toBe(3);
+  });
+
   it("keeps the defined order (incl. named outdoor tables) and appends unknowns", () => {
     const res = deriveTableStatuses([row({ table_no: "15", paid_at: min(1) })], NOW, ["1", "2", "خارجي 1"]);
     expect(res.map((t) => t.table)).toEqual(["1", "2", "خارجي 1", "15"]);

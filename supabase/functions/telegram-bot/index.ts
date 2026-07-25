@@ -135,27 +135,33 @@ async function viewNow() {
 }
 
 async function viewTables() {
-  const rows = await todayTableOrders();
+  const [rows, cfg] = await Promise.all([
+    todayTableOrders(),
+    rest("cafe_tables?select=name,active,sort&active=eq.true&order=sort.asc"),
+  ]);
+  const names: string[] = (cfg as Row[]).map((t) => String(t.name));
+  const tableNames = names.length ? names : Array.from({ length: TABLE_COUNT }, (_, i) => String(i + 1));
+  const label = (t: string) => (/^\d+$/.test(t) ? `طاولة ${t}` : t);
+
   const latest = new Map<string, Row>();
   for (const o of rows) if (!latest.has(o.table_no)) latest.set(o.table_no, o);
   const lines = [`🍽️ <b>حالة الطاولات — اليوم</b>`, ""];
-  const empty: number[] = [];
-  for (let n = 1; n <= TABLE_COUNT; n++) {
-    const o = latest.get(String(n));
-    if (!o) { empty.push(n); continue; }
+  const empty: string[] = [];
+  for (const t of tableNames) {
+    const o = latest.get(t);
+    if (!o) { empty.push(label(t)); continue; }
     const age = agoMin(o.created_at);
-    if (o.status === "pending") lines.push(`🔴 طاولة ${n}: طلب #${String(o.order_seq).padStart(3, "0")} بانتظار الدفع (قبل ${age} د)`);
-    else if (o.status === "paid" && age <= 60) lines.push(`🟢 طاولة ${n}: مشغولة — دُفع قبل ${age} د`);
-    else empty.push(n);
+    if (o.status === "pending") lines.push(`🔴 ${label(t)}: طلب #${String(o.order_seq).padStart(3, "0")} بانتظار الدفع (قبل ${age} د)`);
+    else if (o.status === "paid" && age <= 60) lines.push(`🟢 ${label(t)}: مشغولة — دُفع قبل ${age} د`);
+    else empty.push(label(t));
   }
+  // orders on tables not in the active layout
   for (const [t, o] of latest) {
-    if (!/^\d+$/.test(t) || +t > TABLE_COUNT) {
-      if (o.status === "pending" || agoMin(o.created_at) <= 60) {
-        lines.push(`🟡 طاولة ${esc(t)}: ${o.status === "pending" ? "بانتظار الدفع" : "مشغولة"}`);
-      }
+    if (!tableNames.includes(t) && (o.status === "pending" || agoMin(o.created_at) <= 60)) {
+      lines.push(`🟡 ${label(t)}: ${o.status === "pending" ? "بانتظار الدفع" : "مشغولة"}`);
     }
   }
-  lines.push("", empty.length === TABLE_COUNT ? "كل الطاولات فارغة." : `الطاولات الفارغة: ${empty.join("، ") || "لا شيء"}`);
+  lines.push("", empty.length === tableNames.length ? "كل الطاولات فارغة." : `الطاولات الفارغة: ${empty.join("، ") || "لا شيء"}`);
   return lines.join("\n");
 }
 
@@ -205,10 +211,12 @@ async function viewDailyFinal() {
   const today = baghdadDay();
   const t = sumRows(await summary(today, today));
   const sold = (await aggregateSold(today)).filter(([, q]) => q > 0);
+  const guests = sold.reduce((s, [, q]) => s + q, 0); // one item ≈ one guest
   const closure = (await rest(`register_closures?business_day=eq.${today}&select=remaining,note`))[0];
   const lines = [
     `🌙 <b>التقرير اليومي النهائي — ${today}</b>`, "",
     `🧾 عدد الطلبات: <b>${t.c}</b>`,
+    `👥 عدد الزبائن (تقديري): <b>${guests}</b>`,
     `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
     `📈 الأرباح: <b>${fmt(t.p)} د.ع</b>`,
     `📉 المصروفات: <b>${fmt(t.e)} د.ع</b>`,

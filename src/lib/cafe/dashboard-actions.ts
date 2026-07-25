@@ -22,6 +22,18 @@ export async function getRangeSummary(from: string, to: string): Promise<DaySumm
   return (data ?? []) as DaySummary[];
 }
 
+/** Estimated guest count over a range = total item quantity on paid orders
+ *  (one item ≈ one guest). Admin only — service client. */
+export async function getGuestEstimate(from: string, to: string): Promise<number> {
+  await requireAdmin();
+  const svc = createSupabaseServiceClient();
+  const { data: orders } = await svc.from("orders").select("id").eq("status", "paid").gte("business_day", from).lte("business_day", to);
+  const ids = (orders ?? []).map((o) => o.id);
+  if (!ids.length) return 0;
+  const { data: items } = await svc.from("order_items").select("qty").in("order_id", ids);
+  return (items ?? []).reduce((s, i) => s + i.qty, 0);
+}
+
 export type RecentOrderItem = { name_ar: string; flavor_ar: string | null; qty: number; line_total: number };
 export type RecentOrder = {
   id: string;

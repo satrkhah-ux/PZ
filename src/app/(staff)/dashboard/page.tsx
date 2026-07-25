@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getStaff } from "@/lib/cafe/auth";
 import { isDemoServer } from "@/lib/cafe/demo";
-import { getRangeSummary, getRecentOrders, type DaySummary, type RecentOrder } from "@/lib/cafe/dashboard-actions";
+import { getRangeSummary, getRecentOrders, getGuestEstimate, type DaySummary, type RecentOrder } from "@/lib/cafe/dashboard-actions";
 import { getMonthlyCosts } from "@/lib/cafe/expense-actions";
 import { lastNDays } from "@/lib/cafe/time";
 import { DashboardClient } from "@/components/cafe/DashboardClient";
@@ -24,15 +24,25 @@ export default async function DashboardPage({
   let summary: DaySummary[] = [];
   let recent: RecentOrder[] = [];
   let monthlyCosts = 0;
+  let guestsToday = 0;
+  let guestsRange = 0;
   try {
     const [from, to] = lastNDays(days);
-    const [s, r, mc] = await Promise.all([getRangeSummary(from, to), getRecentOrders(12), getMonthlyCosts()]);
+    const [s, r, mc, gt, gr] = await Promise.all([
+      getRangeSummary(from, to),
+      getRecentOrders(12),
+      getMonthlyCosts(),
+      getGuestEstimate(to, to),
+      getGuestEstimate(from, to),
+    ]);
     summary = s;
     recent = r;
     monthlyCosts = mc.reduce((t, c) => t + c.amount, 0);
+    guestsToday = gt;
+    guestsRange = gr;
   } catch {
     // demo mode or transient DB failure — render the empty state below
   }
 
-  return <DashboardClient days={days} summary={summary} recent={recent} monthlyCosts={monthlyCosts} />;
+  return <DashboardClient days={days} summary={summary} recent={recent} monthlyCosts={monthlyCosts} guestsToday={guestsToday} guestsRange={guestsRange} />;
 }

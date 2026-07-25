@@ -5,7 +5,6 @@ import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { cashierCheckout } from "@/lib/cafe/cashier-actions";
-import { TABLES } from "@/lib/cafe/tables";
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
@@ -48,7 +47,7 @@ function cartReducer(state: Cart, action: CartAction): Cart {
   }
 }
 
-export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
+export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tables: string[] }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const [cart, dispatch] = useReducer(cartReducer, {});
   const [discount, setDiscount] = useState(0);
@@ -309,7 +308,7 @@ export function CashierClient({ menu }: { menu: MenuCategoryView[] }) {
         </div>
         {orderType === "dinein" && (
           <div className="flex flex-wrap gap-1.5">
-            {TABLES.map((n) => (
+            {tables.map((n) => (
               <button
                 key={n}
                 onClick={() => setTableNo(n)}

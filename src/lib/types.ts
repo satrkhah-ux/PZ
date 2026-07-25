@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      cafe_tables: {
+        Row: { name: string; kind: string; active: boolean; pos_x: number; pos_y: number; sort: number; updated_at: string };
+        Insert: { name: string; kind?: string; active?: boolean; pos_x?: number; pos_y?: number; sort?: number; updated_at?: string };
+        Update: Partial<{ kind: string; active: boolean; pos_x: number; pos_y: number; sort: number; updated_at: string }>;
+        Relationships: [];
+      };
       monthly_costs: {
         Row: { category: string; amount: number; updated_at: string };
         Insert: { category: string; amount?: number; updated_at?: string };

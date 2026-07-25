@@ -28,11 +28,15 @@ export function DashboardClient({
   summary,
   recent,
   monthlyCosts,
+  guestsToday,
+  guestsRange,
 }: {
   days: number;
   summary: DaySummary[];
   recent: RecentOrder[];
   monthlyCosts: number;
+  guestsToday: number;
+  guestsRange: number;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const today = summary[summary.length - 1];
@@ -80,9 +84,10 @@ export function DashboardClient({
           {/* today KPIs */}
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-muted-foreground">اليوم ({today?.day})</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <Kpi label="المبيعات" value={formatIqdLabel(today?.sales ?? 0)} />
               <Kpi label="عدد الطلبات" value={String(today?.orders_count ?? 0)} />
+              <Kpi label="عدد الزبائن" value={String(guestsToday)} />
               <Kpi label="الأرباح" value={formatIqdLabel(today?.profit ?? 0)} />
               <Kpi label="المصروفات" value={formatIqdLabel(today?.expenses ?? 0)} />
               <Kpi label="الصافي" value={formatIqdLabel(today?.net ?? 0)} highlight />
@@ -95,9 +100,10 @@ export function DashboardClient({
               <h2 className="text-sm font-semibold text-muted-foreground">
                 إجمالي آخر {days === 7 ? "٧ أيام" : "٣٠ يوماً"}
               </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 <Kpi label="المبيعات" value={formatIqdLabel(totals.sales)} />
                 <Kpi label="عدد الطلبات" value={String(totals.orders)} />
+                <Kpi label="عدد الزبائن" value={String(guestsRange)} />
                 <Kpi label="الأرباح" value={formatIqdLabel(totals.profit)} />
                 <Kpi label="المصروفات" value={formatIqdLabel(totals.expenses)} />
                 <Kpi label="الصافي" value={formatIqdLabel(totals.net)} highlight />
