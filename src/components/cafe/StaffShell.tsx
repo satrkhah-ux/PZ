@@ -3,7 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, BellOff, BellRing, LogOut } from "lucide-react";
+import {
+  Armchair,
+  Bell,
+  BellOff,
+  BellRing,
+  Calculator,
+  ClipboardList,
+  CreditCard,
+  HelpCircle,
+  LayoutDashboard,
+  LogOut,
+  MoreHorizontal,
+  QrCode,
+  UtensilsCrossed,
+  Users,
+  Wallet,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
@@ -50,16 +68,18 @@ function chime() {
   }
 }
 
-const NAV: { href: string; label: string; adminOnly: boolean }[] = [
-  { href: "/dashboard", label: "لوحة التحكم", adminOnly: true },
-  { href: "/cashier", label: "الكاشير", adminOnly: false },
-  { href: "/orders", label: "الطلبات الواردة", adminOnly: false },
-  { href: "/tables", label: "الطاولات", adminOnly: false },
-  { href: "/menu-admin", label: "المنيو", adminOnly: true },
-  { href: "/loyalty", label: "الولاء", adminOnly: false },
-  { href: "/expenses", label: "المصروفات", adminOnly: false },
-  { href: "/employees", label: "الموظفون", adminOnly: true },
-  { href: "/qr", label: "رموز QR", adminOnly: true },
+type NavItem = { href: string; label: string; short: string; adminOnly: boolean; icon: LucideIcon };
+const NAV: NavItem[] = [
+  { href: "/dashboard", label: "لوحة التحكم", short: "التحكم", adminOnly: true, icon: LayoutDashboard },
+  { href: "/cashier", label: "الكاشير", short: "الكاشير", adminOnly: false, icon: Calculator },
+  { href: "/orders", label: "الطلبات الواردة", short: "الطلبات", adminOnly: false, icon: ClipboardList },
+  { href: "/tables", label: "الطاولات", short: "الطاولات", adminOnly: false, icon: Armchair },
+  { href: "/loyalty", label: "الولاء", short: "الولاء", adminOnly: false, icon: CreditCard },
+  { href: "/menu-admin", label: "المنيو", short: "المنيو", adminOnly: true, icon: UtensilsCrossed },
+  { href: "/expenses", label: "المصروفات", short: "المصروفات", adminOnly: false, icon: Wallet },
+  { href: "/employees", label: "الموظفون", short: "الموظفون", adminOnly: true, icon: Users },
+  { href: "/qr", label: "رموز QR", short: "QR", adminOnly: true, icon: QrCode },
+  { href: "/help", label: "التعليمات", short: "تعليمات", adminOnly: false, icon: HelpCircle },
 ];
 
 export function StaffShell({
@@ -76,6 +96,8 @@ export function StaffShell({
   const pathname = usePathname();
   const router = useRouter();
   const links = NAV.filter((n) => !n.adminOnly || role === "admin");
+  const bottomTabs = links.filter((l) => l.href !== "/help").slice(0, 4); // first 4 as bottom tabs, rest in «المزيد»
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // Keep the session alive on staff screens: instantiating the browser client
   // starts supabase-js's auto-refresh loop, which renews the access token and
@@ -191,7 +213,7 @@ export function StaffShell({
               <PizzaraMark className="size-9" />
               بيزارا كافيه
             </Link>
-            <nav className="flex gap-1 overflow-x-auto">
+            <nav className="hidden gap-1 overflow-x-auto md:flex">
               {links.map((l) => (
                 <Link
                   key={l.href}
@@ -246,7 +268,80 @@ export function StaffShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5 pb-24 md:pb-5">{children}</main>
+
+      {/* app-like bottom tab bar (mobile only) */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur md:hidden print:hidden">
+        {bottomTabs.map((l) => {
+          const active = pathname.startsWith(l.href);
+          const Icon = l.icon;
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold transition ${
+                active ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="size-5" />
+              {l.short}
+              {l.href === "/orders" && pendingCount > 0 && (
+                <span className="absolute right-1/2 top-1 translate-x-4 rounded-full bg-destructive px-1.5 text-[9px] font-bold text-destructive-foreground">
+                  {pendingCount}
+                </span>
+              )}
+            </Link>
+          );
+        })}
+        <button
+          onClick={() => setMoreOpen(true)}
+          className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-muted-foreground"
+        >
+          <MoreHorizontal className="size-5" />
+          المزيد
+        </button>
+      </nav>
+
+      {/* «المزيد» sheet — the full menu */}
+      {moreOpen && (
+        <div className="fixed inset-0 z-40 md:hidden print:hidden" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-card p-4 pb-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="font-bold">{name}</span>
+              <button onClick={() => setMoreOpen(false)} aria-label="إغلاق" className="rounded-lg border border-border p-1.5 hover:bg-secondary">
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {links.map((l) => {
+                const Icon = l.icon;
+                const active = pathname.startsWith(l.href);
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setMoreOpen(false)}
+                    className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition ${
+                      active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary"
+                    }`}
+                  >
+                    <Icon className="size-6" />
+                    {l.label}
+                  </Link>
+                );
+              })}
+              <button
+                onClick={signOut}
+                className="flex flex-col items-center gap-1.5 rounded-2xl border border-border p-3 text-xs font-semibold text-destructive hover:bg-secondary"
+              >
+                <LogOut className="size-6" />
+                تسجيل الخروج
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* new-order toast */}
       {toast && (
