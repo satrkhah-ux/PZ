@@ -1,7 +1,7 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { PrintButton } from "@/components/cafe/PrintButton";
-import { tableLabel } from "@/lib/cafe/tables";
+import { tableLabel, DEFAULT_TABLES } from "@/lib/cafe/tables";
 import { getActiveTableNames } from "@/lib/cafe/table-actions";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,7 @@ export default async function QrPage({
 
   const opts = { margin: 1, color: { dark: "#42301f", light: "#ffffff" } };
   const menuQr = await QRCode.toDataURL(`${base}${menuPath}`, { ...opts, width: 380 });
-  const activeTables = await getActiveTableNames().catch(() => []);
+  const activeTables = await getActiveTableNames().catch(() => DEFAULT_TABLES);
   const tables = await Promise.all(
     activeTables.map(async (n) => ({
       n,

@@ -23,15 +23,13 @@ export async function getRangeSummary(from: string, to: string): Promise<DaySumm
 }
 
 /** Estimated guest count over a range = total item quantity on paid orders
- *  (one item ≈ one guest). Admin only — service client. */
+ *  (one item ≈ one guest). Aggregated server-side by the guest_estimate RPC so
+ *  it isn't silently capped by PostgREST's 1000-row limit. Admin only. */
 export async function getGuestEstimate(from: string, to: string): Promise<number> {
   await requireAdmin();
   const svc = createSupabaseServiceClient();
-  const { data: orders } = await svc.from("orders").select("id").eq("status", "paid").gte("business_day", from).lte("business_day", to);
-  const ids = (orders ?? []).map((o) => o.id);
-  if (!ids.length) return 0;
-  const { data: items } = await svc.from("order_items").select("qty").in("order_id", ids);
-  return (items ?? []).reduce((s, i) => s + i.qty, 0);
+  const { data } = await svc.rpc("guest_estimate", { p_from: from, p_to: to });
+  return Number(data) || 0;
 }
 
 export type RecentOrderItem = { name_ar: string; flavor_ar: string | null; qty: number; line_total: number };

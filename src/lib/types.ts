@@ -182,6 +182,8 @@ export type Database = {
       adjust_points: { Args: { p_customer: string; p_delta: number; p_reason: string; p_key?: string | null }; Returns: number };
       redeem_points: { Args: { p_customer: string; p_cost: number; p_key: string }; Returns: number };
       get_orders_public: { Args: { p_orders: string[] }; Returns: Json };
+      save_cafe_tables: { Args: { p_tables: Json }; Returns: undefined };
+      guest_estimate: { Args: { p_from: string; p_to: string }; Returns: number };
       range_summary: {
         Args: { p_from: string; p_to: string };
         Returns: { day: string; sales: number; orders_count: number; profit: number; expenses: number; net: number }[];

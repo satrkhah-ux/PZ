@@ -92,7 +92,7 @@ export function TablesClient() {
         <p className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">جارٍ التحميل…</p>
       ) : activeLayout.length > 0 ? (
         // positioned floor map
-        <div className="relative h-[64vh] min-h-[400px] w-full overflow-hidden rounded-2xl border-2 border-border bg-secondary/20">
+        <div className="relative h-[64vh] min-h-[400px] w-full overflow-hidden rounded-2xl border-2 border-border bg-secondary/20 p-2">
           <span className="pointer-events-none absolute right-3 top-2 text-xs text-muted-foreground">🚪 واجهة المحل</span>
           {activeLayout.map((lt) => {
             const s = statusByName.get(lt.name);
@@ -100,7 +100,7 @@ export function TablesClient() {
             return (
               <div
                 key={lt.name}
-                style={{ left: `${lt.x}%`, top: `${lt.y}%` }}
+                style={{ left: `${lt.x}%`, top: `${lt.y}%`, transform: "translate(-50%, -50%)" }}
                 className={`absolute flex min-h-16 w-20 flex-col items-center justify-center rounded-xl border-2 p-1 text-center shadow ${stateColor[state]}`}
               >
                 <span className="text-sm font-extrabold leading-tight">{tableLabel(lt.name)}</span>

@@ -49,6 +49,21 @@ async function rest(path: string) {
   if (!r.ok) throw new Error(`REST ${r.status}: ${(await r.text()).slice(0, 120)}`);
   return r.json();
 }
+// paginated GET — PostgREST caps a single response at 1000 rows, so page with
+// Range until a short page is returned (used for wide item aggregations).
+async function restAll(path: string): Promise<any[]> {
+  const rows: any[] = [];
+  const size = 1000;
+  for (let from = 0; ; from += size) {
+    const r = await fetch(`${URL_}/rest/v1/${path}`, { headers: { ...H, Range: `${from}-${from + size - 1}` } });
+    if (!r.ok) throw new Error(`REST ${r.status}: ${(await r.text()).slice(0, 120)}`);
+    const chunk = await r.json();
+    if (!Array.isArray(chunk) || chunk.length === 0) break;
+    rows.push(...chunk);
+    if (chunk.length < size) break;
+  }
+  return rows;
+}
 async function restWrite(path: string, method: string, body?: unknown) {
   const r = await fetch(`${URL_}/rest/v1/${path}`, {
     method, headers: { ...H, Prefer: "return=minimal" }, body: body ? JSON.stringify(body) : undefined,
@@ -69,7 +84,7 @@ const pendingOrders = () =>
 const todayTableOrders = () =>
   rest(`orders?business_day=eq.${baghdadDay()}&table_no=not.is.null&select=table_no,status,order_seq,created_at&order=created_at.desc`);
 const soldByItem = (fromDay: string) =>
-  rest(`order_items?select=name_ar,qty,orders!inner(status,business_day)&orders.status=eq.paid&orders.business_day=gte.${fromDay}`);
+  restAll(`order_items?select=name_ar,qty,orders!inner(status,business_day)&orders.status=eq.paid&orders.business_day=gte.${fromDay}`);
 const allItems = () => rest("menu_items?select=id,name_ar,price,cost,is_active,category_id&order=sort.asc");
 const allCats = () => rest("categories?select=id,name_ar,sort&order=sort.asc");
 const oneItem = async (id: string) =>
