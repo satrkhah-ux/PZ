@@ -11,6 +11,7 @@ import {
   Calculator,
   ClipboardList,
   CreditCard,
+  Croissant,
   HelpCircle,
   LayoutDashboard,
   LogOut,
@@ -78,6 +79,7 @@ const NAV: NavItem[] = [
   { href: "/orders", label: "الطلبات الواردة", short: "الطلبات", adminOnly: false, icon: ClipboardList },
   { href: "/tables", label: "الطاولات", short: "الطاولات", adminOnly: false, icon: Armchair },
   { href: "/loyalty", label: "الولاء", short: "الولاء", adminOnly: false, icon: CreditCard },
+  { href: "/pastries", label: "المعجنات والعروض", short: "المعجنات", adminOnly: false, icon: Croissant },
   { href: "/menu-admin", label: "المنيو", short: "المنيو", adminOnly: true, icon: UtensilsCrossed },
   { href: "/expenses", label: "المصروفات", short: "المصروفات", adminOnly: false, icon: Wallet },
   { href: "/employees", label: "الموظفون", short: "الموظفون", adminOnly: true, icon: Users },
@@ -89,11 +91,13 @@ export function StaffShell({
   role,
   name,
   pushKey = null,
+  pastryAlert = 0,
   children,
 }: {
   role: StaffRole | null;
   name: string;
   pushKey?: string | null;
+  pastryAlert?: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -229,9 +233,9 @@ export function StaffShell({
                   }`}
                 >
                   {l.label}
-                  {l.href === "/orders" && pendingCount > 0 && (
+                  {((l.href === "/orders" && pendingCount > 0) || (l.href === "/pastries" && pastryAlert > 0)) && (
                     <span className="absolute -left-1 -top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-                      {pendingCount}
+                      {l.href === "/orders" ? pendingCount : pastryAlert}
                     </span>
                   )}
                 </Link>
@@ -308,10 +312,15 @@ export function StaffShell({
         })}
         <button
           onClick={() => setMoreOpen(true)}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-muted-foreground"
+          className="relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-semibold text-muted-foreground"
         >
           <MoreHorizontal className="size-5" />
           المزيد
+          {pastryAlert > 0 && (
+            <span className="absolute right-1/2 top-1 translate-x-4 rounded-full bg-destructive px-1.5 text-[9px] font-bold text-destructive-foreground">
+              {pastryAlert}
+            </span>
+          )}
         </button>
       </nav>
 
@@ -335,12 +344,17 @@ export function StaffShell({
                     key={l.href}
                     href={l.href}
                     onClick={() => setMoreOpen(false)}
-                    className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition ${
+                    className={`relative flex flex-col items-center gap-1.5 rounded-2xl border p-3 text-xs font-semibold transition ${
                       active ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-secondary"
                     }`}
                   >
                     <Icon className="size-6" />
                     {l.label}
+                    {l.href === "/pastries" && pastryAlert > 0 && (
+                      <span className="absolute right-2 top-2 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                        {pastryAlert}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

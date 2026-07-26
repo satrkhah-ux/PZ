@@ -1,4 +1,5 @@
 import { getPublicMenu } from "@/lib/cafe/menu-data";
+import { getActiveOffers } from "@/lib/cafe/pastry-actions";
 import { isDemoServer } from "@/lib/cafe/demo";
 import { ModernMenuClient } from "@/components/cafe/ModernMenuClient";
 
@@ -13,7 +14,8 @@ export default async function MenuPage({
 }) {
   const sp = await searchParams;
   const preview = sp.preview === "v2";
-  let menu = await getPublicMenu();
+  const [menuData, offers] = await Promise.all([getPublicMenu(), getActiveOffers().catch(() => [])]);
+  let menu = menuData;
   if (preview) {
     menu = menu.map((c) => ({
       ...c,
@@ -23,5 +25,5 @@ export default async function MenuPage({
       })),
     }));
   }
-  return <ModernMenuClient menu={menu} table={sp.t ?? null} demo={isDemoServer()} preview={preview} />;
+  return <ModernMenuClient menu={menu} offers={offers} table={sp.t ?? null} demo={isDemoServer()} preview={preview} />;
 }

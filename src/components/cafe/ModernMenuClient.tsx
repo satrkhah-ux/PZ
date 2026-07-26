@@ -70,12 +70,14 @@ const DROPS = [
 
 export function ModernMenuClient({
   menu,
+  offers = [],
   table,
   demo,
   preview = false,
   channel = "qr",
 }: {
   menu: MenuCategoryView[];
+  offers?: { id: string; title: string; description: string | null }[];
   table?: string | null;
   demo: boolean;
   preview?: boolean;
@@ -217,8 +219,16 @@ export function ModernMenuClient({
               </Link>
             </div>
           </div>
-          {/* categories */}
+          {/* categories — big tappable pills for easy navigation between sections */}
           <nav className="mt-3 -mb-1 flex gap-2 overflow-x-auto pb-1">
+            {offers.length > 0 && (
+              <button
+                onClick={() => document.getElementById("pz-offers")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="whitespace-nowrap rounded-full border-2 border-[#d18b4a] bg-[#d18b4a]/15 px-5 py-2 text-[15px] font-bold text-[#d18b4a] transition hover:bg-[#d18b4a]/25"
+              >
+                🎁 العروض
+              </button>
+            )}
             {menu.map((c) => (
               <button
                 key={c.name_ar}
@@ -226,10 +236,10 @@ export function ModernMenuClient({
                   pillRefs.current[c.name_ar] = el;
                 }}
                 onClick={() => goTo(c.name_ar)}
-                className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                className={`whitespace-nowrap rounded-full px-5 py-2 text-[15px] font-bold transition ${
                   c.name_ar === activeCat
                     ? "bg-[#d18b4a] text-[#2b1a10]"
-                    : "border border-[#d18b4a]/30 text-[#f3e3cf]/80 hover:bg-[#d18b4a]/10"
+                    : "border border-[#d18b4a]/40 text-[#f3e3cf]/85 hover:bg-[#d18b4a]/10"
                 }`}
               >
                 {c.name_ar}
@@ -240,6 +250,19 @@ export function ModernMenuClient({
 
         {/* one continuous scroll through every category */}
         <main className="space-y-8 px-4 py-5 pb-32">
+          {offers.length > 0 && (
+            <section id="pz-offers" className="scroll-mt-36">
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-[#d18b4a]">🎁 عروض اليوم</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {offers.map((o) => (
+                  <div key={o.id} className="rounded-2xl border-2 border-[#d18b4a]/50 bg-gradient-to-br from-[#d18b4a]/20 to-transparent p-4">
+                    <p className="font-extrabold text-[#f3e3cf]">{o.title}</p>
+                    {o.description && <p className="mt-1 text-sm text-[#f3e3cf]/70">{o.description}</p>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           {menu.map((c) => {
             const effect = effectFor(c.name_ar);
             return (
