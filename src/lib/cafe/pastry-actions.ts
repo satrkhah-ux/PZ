@@ -5,8 +5,6 @@ import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/s
 import { requireStaff } from "./auth";
 import { businessDay } from "./time";
 
-export const SHELF_DAYS = 6;
-
 export type BatchState = "fresh" | "soon" | "expired";
 export type PastryBatch = {
   id: string;
