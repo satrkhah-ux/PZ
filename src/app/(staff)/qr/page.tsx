@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { PrintButton } from "@/components/cafe/PrintButton";
+import { NfcWriter } from "@/components/cafe/NfcWriter";
 import { tableLabel, DEFAULT_TABLES } from "@/lib/cafe/tables";
 import { getActiveTableNames } from "@/lib/cafe/table-actions";
 
@@ -25,23 +26,22 @@ export default async function QrPage({
   const menuQr = await QRCode.toDataURL(`${base}${menuPath}`, { ...opts, width: 380 });
   const activeTables = await getActiveTableNames().catch(() => DEFAULT_TABLES);
   const tables = await Promise.all(
-    activeTables.map(async (n) => ({
-      n,
-      label: tableLabel(n),
-      qr: await QRCode.toDataURL(`${base}${menuPath}?t=${encodeURIComponent(n)}`, { ...opts, width: 300 }),
-    })),
+    activeTables.map(async (n) => {
+      const url = `${base}${menuPath}?t=${encodeURIComponent(n)}`;
+      return { n, label: tableLabel(n), url, qr: await QRCode.toDataURL(url, { ...opts, width: 300 }) };
+    }),
   );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold">رموز QR</h1>
+          <h1 className="text-2xl font-bold">رموز QR و NFC</h1>
           <p className="text-sm text-muted-foreground" dir="ltr">
             {base}/menu
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            بعد النشر على الإنترنت أضف <code dir="ltr">?base=https://رابطك</code> لتوليد رموز بالرابط النهائي.
+            بعد النشر أضف <code dir="ltr">?base=https://رابطك</code> للرابط النهائي. لكتابة NFC: افتح هذه الصفحة من هاتف أندرويد (Chrome)، اضغط «اكتب NFC» وقرّب البطاقة. على الآيفون انسخ الرابط واكتبه بتطبيق «NFC Tools».
           </p>
         </div>
         <PrintButton label="طباعة الملصقات" />
@@ -64,6 +64,9 @@ export default async function QrPage({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={t.qr} alt={t.label} className="mx-auto size-40" />
             <p className="mt-1.5 text-xs text-muted-foreground">امسح للطلب من طاولتك</p>
+            <div className="print:hidden">
+              <NfcWriter url={t.url} />
+            </div>
           </div>
         ))}
       </div>
