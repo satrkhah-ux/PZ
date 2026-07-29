@@ -131,13 +131,20 @@ $browser = @(
   "C:\Program Files\Microsoft\Edge\Application\msedge.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if ($browser) {
+  # أيقونة بيزارا للاختصار (تُنزَّل مرة واحدة؛ إن فشل التنزيل نستخدم أيقونة المتصفح)
+  $ico = "$dir\pizzara.ico"
+  try {
+    Invoke-WebRequest "https://raw.githubusercontent.com/satrkhah-ux/PZ/main/public/logo.ico" -OutFile $ico -UseBasicParsing -TimeoutSec 20
+  } catch { $ico = $null }
+
   $ws = New-Object -ComObject WScript.Shell
   $lnk = $ws.CreateShortcut("$([Environment]::GetFolderPath('CommonDesktopDirectory'))\كاشير بيزارا.lnk")
   $lnk.TargetPath = $browser
-  $lnk.Arguments = "--kiosk-printing --start-maximized https://pizzara-modern.netlify.app/cashier"
-  $lnk.IconLocation = "$browser,0"
+  # نافذة تطبيق مستقلة بلا أشرطة متصفح (--app) + طباعة صامتة + ملء الشاشة — تفتح الكاشير مباشرة كتطبيق
+  $lnk.Arguments = "--app=https://pizzara-modern.netlify.app/cashier --kiosk-printing --start-maximized --no-first-run"
+  if ($ico -and (Test-Path $ico)) { $lnk.IconLocation = "$ico,0" } else { $lnk.IconLocation = "$browser,0" }
   $lnk.Save()
-  Say "اختصار «كاشير بيزارا» على سطح المكتب (طباعة صامتة — افتحه وكل نوافذ المتصفح الأخرى مغلقة)"
+  Say "اختصار «كاشير بيزارا» (نافذة تطبيق نظيفة بلا متصفح + أيقونة بيزارا + طباعة صامتة)"
 } else {
   Say "لم أجد Chrome أو Edge — ثبّت أحدهما ثم أعد التشغيل" $false
 }
