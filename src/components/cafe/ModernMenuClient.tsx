@@ -250,6 +250,15 @@ export function ModernMenuClient({
 
         {/* one continuous scroll through every category */}
         <main className="space-y-8 px-4 py-5 pb-32">
+          {/* branded welcome */}
+          <section className="flex flex-col items-center gap-2 pt-1 text-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="بيزارا كافيه" className="size-24 drop-shadow-[0_4px_18px_rgba(209,139,74,0.4)]" />
+            <h2 className="text-2xl font-extrabold text-[#d18b4a]">أهلاً بك في بيزارا كافيه</h2>
+            <p className="text-sm text-[#f3e3cf]/70">
+              تصفّح المنيو واطلب من طاولتك{table ? ` · طاولة ${table}` : ""}
+            </p>
+          </section>
           {offers.length > 0 && (
             <section id="pz-offers" className="scroll-mt-36">
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-[#d18b4a]">🎁 عروض اليوم</h2>
