@@ -145,6 +145,14 @@ if ($browser) {
   if ($ico -and (Test-Path $ico)) { $lnk.IconLocation = "$ico,0" } else { $lnk.IconLocation = "$browser,0" }
   $lnk.Save()
   Say "اختصار «كاشير بيزارا» (نافذة تطبيق نظيفة بلا متصفح + أيقونة بيزارا + طباعة صامتة)"
+
+  # ── يفتح الكاشير تلقائياً عند تشغيل ويندوز (نسخة من الاختصار في مجلد بدء التشغيل) ──
+  $startupLnk = $ws.CreateShortcut("$startupDir\كاشير بيزارا.lnk")
+  $startupLnk.TargetPath  = $browser
+  $startupLnk.Arguments   = $lnk.Arguments
+  $startupLnk.IconLocation = $lnk.IconLocation
+  $startupLnk.Save()
+  Say "الكاشير سيفتح تلقائياً عند بدء تشغيل ويندوز 🚀"
 } else {
   Say "لم أجد Chrome أو Edge — ثبّت أحدهما ثم أعد التشغيل" $false
 }
@@ -152,6 +160,11 @@ if ($browser) {
 Write-Host ""
 Write-Host "══════ اكتمل الإعداد ══════"
 Write-Host "الطابعة: $($chosen.Name)  |  المشاركة: $share  |  الوكيل: 127.0.0.1:9977"
-Write-Host "المتبقي عليك: افتح «كاشير بيزارا» وفعّل داخل الشاشة خياري 🖨️ و 💰"
+Write-Host "الكاشير + وكيل الدرج يبدآن تلقائياً عند تشغيل ويندوز (بعد تسجيل الدخول)."
+Write-Host "المتبقي عليك: أول مرة سجّل الدخول في «كاشير بيزارا» وفعّل خياري 🖨️ و 💰 داخل الشاشة."
+Write-Host ""
+Write-Host "اختياري — لتشغيل غير مراقَب تماماً (بلا كتابة كلمة سر ويندوز عند الإقلاع):"
+Write-Host "  شغّل  netplwiz  ← ألغِ تحديد «يجب على المستخدمين إدخال اسم وكلمة مرور» ← أدخل كلمة السر مرة."
+Write-Host "  (هذا إعداد ويندوز يخصّك؛ يخزّن كلمة السر محلياً — فعّله فقط على جهاز الكاشير المخصّص.)"
 Write-Host ""
 Read-Host "اضغط Enter للإغلاق"
