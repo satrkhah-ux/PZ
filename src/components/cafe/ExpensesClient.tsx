@@ -10,6 +10,7 @@ import {
   type RegisterClosure,
   type MonthlyCost,
 } from "@/lib/cafe/expense-actions";
+import { PriceInput } from "./PriceInput";
 import { formatIqdLabel } from "@/lib/cafe/money";
 
 // fixed monthly bills — a persistent baseline, set once, subtracted monthly
@@ -28,7 +29,7 @@ export function ExpensesClient({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,15 +69,19 @@ export function ExpensesClient({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (amount <= 0) {
+      setMsg("أدخل المبلغ.");
+      return;
+    }
     setBusy(true);
     setMsg(null);
-    const res = await addExpense({ amount: Number(amount), category, note });
+    const res = await addExpense({ amount, category, note });
     setBusy(false);
     if (!res.ok) {
       setMsg(res.error);
       return;
     }
-    setAmount("");
+    setAmount(0);
     setNote("");
     router.refresh();
   }
@@ -126,16 +131,7 @@ export function ExpensesClient({
       <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-[160px_180px_1fr_auto]">
         <label className="space-y-1 text-sm">
           <span className="text-muted-foreground">المبلغ (د.ع)</span>
-          <input
-            id="expense-amount"
-            type="number"
-            min={1}
-            required
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
-            dir="ltr"
-          />
+          <PriceInput value={amount} onChange={setAmount} />
         </label>
         <label className="space-y-1 text-sm">
           <span className="text-muted-foreground">التصنيف</span>

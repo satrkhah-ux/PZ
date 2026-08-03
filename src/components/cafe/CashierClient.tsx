@@ -9,6 +9,7 @@ import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
 import { MenuIcon } from "./MenuIcon";
+import { PriceInput } from "./PriceInput";
 
 type Line = {
   key: string;
@@ -68,7 +69,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   // itemized surcharges for add-ons the customer requests (extra shot, syrup…)
   const [extras, setExtras] = useState<{ name: string; price: number }[]>([]);
   const [extraName, setExtraName] = useState("");
-  const [extraPrice, setExtraPrice] = useState("");
+  const [extraPrice, setExtraPrice] = useState(0);
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
@@ -93,11 +94,11 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
 
   function addExtra() {
     const name = extraName.trim();
-    const price = Math.max(0, Math.round(Number(extraPrice) || 0));
+    const price = Math.max(0, Math.round(extraPrice || 0));
     if (!name || price <= 0) return;
     setExtras((xs) => [...xs, { name, price }]);
     setExtraName("");
-    setExtraPrice("");
+    setExtraPrice(0);
   }
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
 
@@ -305,16 +306,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
               placeholder="نوع الإضافة (شوت، كراميل…)"
               className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
-            <input
-              type="number"
-              min={0}
-              value={extraPrice}
-              onChange={(e) => setExtraPrice(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addExtra()}
-              placeholder="السعر"
-              dir="ltr"
-              className="w-20 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+            <PriceInput value={extraPrice} onChange={setExtraPrice} />
             <button onClick={addExtra} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
               +
             </button>
