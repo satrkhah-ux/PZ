@@ -16,6 +16,7 @@ import {
 } from "@/lib/cafe/menu-admin-actions";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { MenuIcon } from "./MenuIcon";
+import { PriceInput } from "./PriceInput";
 
 type Editing = { item: AdminItem | null; categoryId: string };
 
@@ -171,7 +172,7 @@ function ItemForm({ editing, categories, onClose }: { editing: Editing; categori
   const it = editing.item;
   const [name, setName] = useState(it?.name_ar ?? "");
   const [categoryId, setCategoryId] = useState(editing.categoryId);
-  const [price, setPrice] = useState(String(it?.price ?? ""));
+  const [price, setPrice] = useState<number>(it?.price ?? 0);
   const [cost, setCost] = useState(String(it?.cost ?? ""));
   const [flavors, setFlavors] = useState((it?.flavors ?? []).join("، "));
   const [description, setDescription] = useState(it?.description_ar ?? "");
@@ -272,7 +273,7 @@ function ItemForm({ editing, categories, onClose }: { editing: Editing; categori
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">سعر البيع (د.ع) *</span>
-            <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} dir="ltr" className="w-full rounded-lg border border-input bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
+            <PriceInput value={price} onChange={setPrice} />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">الكلفة (د.ع) — لحساب الأرباح</span>

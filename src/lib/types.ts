@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      daily_resets: {
+        Row: Timestamped & { reset_at: string; by_employee: string | null };
+        Insert: { id?: string; reset_at?: string; by_employee?: string | null; created_at?: string };
+        Update: Partial<{ reset_at: string; by_employee: string | null }>;
+        Relationships: [];
+      };
       pastry_batches: {
         Row: Timestamped & { item_name: string; quantity: number; deposited_on: string; shelf_days: number; active: boolean; note: string | null };
         Insert: { id?: string; item_name: string; quantity?: number; deposited_on?: string; shelf_days?: number; active?: boolean; note?: string | null; created_at?: string };

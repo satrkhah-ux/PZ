@@ -72,11 +72,16 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
   const drawerKickRef = useRef(false);
+  const kickBusyRef = useRef(false);
+  const checkoutBusyRef = useRef(false);
   useEffect(() => {
     drawerKickRef.current = localStorage.getItem("pz-drawer") === "1";
   }, []);
   function kickDrawer() {
-    if (!drawerKickRef.current) return;
+    // guard against a double-open if the pay action ever fires twice in quick succession
+    if (!drawerKickRef.current || kickBusyRef.current) return;
+    kickBusyRef.current = true;
+    setTimeout(() => { kickBusyRef.current = false; }, 2500);
     // localhost is exempt from mixed-content blocking; fire-and-forget
     fetch("http://127.0.0.1:9977/kick", { mode: "no-cors" }).catch(() => {});
   }
@@ -129,11 +134,14 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   }
 
   async function checkout() {
-    if (!lines.length || busy) return;
+    // checkoutBusyRef is synchronous — `busy` state updates a tick later, so a
+    // rapid double-tap would otherwise submit twice (double order + double drawer).
+    if (!lines.length || checkoutBusyRef.current || busy) return;
     if (orderType === "dinein" && !tableNo) {
       setErr("اختر رقم الطاولة.");
       return;
     }
+    checkoutBusyRef.current = true;
     setBusy(true);
     setErr(null);
     const table = orderType === "dinein" ? tableNo : null;
@@ -141,6 +149,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
     const res = await cashierCheckout({ lines: payload, discount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
     setBusy(false);
+    checkoutBusyRef.current = false;
     if (!res.ok) {
       setErr(res.error);
       return;

@@ -42,6 +42,7 @@ export function IncomingOrdersClient() {
   const [drawerKick, setDrawerKick] = useState(false);
   const autoPrintRef = useRef(false);
   const drawerKickRef = useRef(false);
+  const kickBusyRef = useRef(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of persisted device settings
     setAutoPrint(localStorage.getItem("pz-autoprint") === "1");
@@ -56,7 +57,10 @@ export function IncomingOrdersClient() {
     localStorage.setItem("pz-drawer", drawerKick ? "1" : "0");
   }, [drawerKick]);
   function kickDrawer() {
-    if (!drawerKickRef.current) return;
+    // guard against a double-open if the pay action fires twice in quick succession
+    if (!drawerKickRef.current || kickBusyRef.current) return;
+    kickBusyRef.current = true;
+    setTimeout(() => { kickBusyRef.current = false; }, 2500);
     fetch("http://127.0.0.1:9977/kick", { mode: "no-cors" }).catch(() => {});
   }
 

@@ -2,6 +2,8 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { resetDailyAccount } from "@/lib/cafe/dashboard-actions";
 import {
   Area,
   AreaChart,
@@ -30,6 +32,7 @@ export function DashboardClient({
   monthlyCosts,
   guestsToday,
   guestsRange,
+  todayReset = null,
 }: {
   days: number;
   summary: DaySummary[];
@@ -37,9 +40,21 @@ export function DashboardClient({
   monthlyCosts: number;
   guestsToday: number;
   guestsRange: number;
+  todayReset?: DaySummary | null;
 }) {
+  const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const today = summary[summary.length - 1];
+  const [resetting, setResetting] = useState(false);
+  // TODAY card reflects the shift-settlement reset; the range/charts + bot stay full.
+  const today = todayReset ?? summary[summary.length - 1];
+
+  async function doReset() {
+    if (!window.confirm("تصفير الحساب اليومي؟\nسيبدأ عرض «اليوم» من الصفر (للتحاسب مع الموظفين). لا يؤثر على التقارير أو بوت التليجرام.")) return;
+    setResetting(true);
+    await resetDailyAccount();
+    setResetting(false);
+    router.refresh();
+  }
   const totals = summary.reduce(
     (t, d) => ({
       sales: t.sales + d.sales,
@@ -83,7 +98,17 @@ export function DashboardClient({
         <>
           {/* today KPIs */}
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-muted-foreground">اليوم ({today?.day})</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">اليوم ({today?.day})</h2>
+              <button
+                onClick={doReset}
+                disabled={resetting}
+                title="يصفّر عرض «اليوم» فقط — للتحاسب مع الموظفين. لا يؤثر على التقارير أو البوت."
+                className="rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+              >
+                {resetting ? "…" : "تصفير الحساب اليومي"}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <Kpi label="المبيعات" value={formatIqdLabel(today?.sales ?? 0)} />
               <Kpi label="عدد الطلبات" value={String(today?.orders_count ?? 0)} />
