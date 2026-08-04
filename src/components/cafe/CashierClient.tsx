@@ -152,45 +152,52 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     checkoutBusyRef.current = true;
     setBusy(true);
     setErr(null);
-    const table = orderType === "dinein" ? tableNo : null;
-    const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
-    const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-    const res = await cashierCheckout({ lines: payload, discount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
-    setBusy(false);
-    checkoutBusyRef.current = false;
-    if (!res.ok) {
-      setErr(res.error);
-      return;
+    // try/finally so the button ALWAYS unsticks — a thrown action (expired
+    // session, network drop) must never freeze the cashier on «جار التنفيذ».
+    try {
+      const table = orderType === "dinein" ? tableNo : null;
+      const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
+      const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
+      const res = await cashierCheckout({ lines: payload, discount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+      if (!res.ok) {
+        setErr(res.error);
+        return;
+      }
+      setReceipt({
+        orderNumber: res.orderNumber,
+        table,
+        note: orderNote.trim() || null,
+        lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
+        subtotal,
+        discount,
+        extras,
+        total,
+        dateTime: new Date().toLocaleString("en-GB", {
+          timeZone: "Asia/Baghdad",
+          hour: "2-digit",
+          minute: "2-digit",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        }),
+      });
+      if (payMethod === "cash") kickDrawer();
+      setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });
+      dispatch({ type: "clear" });
+      setCustomer(null);
+      setDiscount(0);
+      setExtras([]);
+      setSerialInput("");
+      setPayMethod("cash");
+      setOrderType("takeaway");
+      setTableNo("");
+      setOrderNote("");
+    } catch {
+      setErr("تعذّر إتمام الطلب — تأكد من الاتصال بالإنترنت وأعد المحاولة. إن تكرّر، حدّث الصفحة (F5).");
+    } finally {
+      checkoutBusyRef.current = false;
+      setBusy(false);
     }
-    setReceipt({
-      orderNumber: res.orderNumber,
-      table,
-      note: orderNote.trim() || null,
-      lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
-      subtotal,
-      discount,
-      extras,
-      total,
-      dateTime: new Date().toLocaleString("en-GB", {
-        timeZone: "Asia/Baghdad",
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }),
-    });
-    if (payMethod === "cash") kickDrawer();
-    setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });
-    dispatch({ type: "clear" });
-    setCustomer(null);
-    setDiscount(0);
-    setExtras([]);
-    setSerialInput("");
-    setPayMethod("cash");
-    setOrderType("takeaway");
-    setTableNo("");
-    setOrderNote("");
   }
 
   return (
