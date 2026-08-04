@@ -68,7 +68,6 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const [orderNote, setOrderNote] = useState("");
   // itemized surcharges for add-ons the customer requests (extra shot, syrup…)
   const [extras, setExtras] = useState<{ name: string; price: number }[]>([]);
-  const [extraName, setExtraName] = useState("");
   const [extraPrice, setExtraPrice] = useState(0);
 
   // cash drawer: device setting managed on the /orders screen (same localStorage key).
@@ -93,11 +92,10 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const total = Math.max(0, subtotal - discount + extraTotal);
 
   function addExtra() {
-    const name = extraName.trim();
+    // description is verbal at the counter — the cashier only enters the amount
     const price = Math.max(0, Math.round(extraPrice || 0));
-    if (!name || price <= 0) return;
-    setExtras((xs) => [...xs, { name, price }]);
-    setExtraName("");
+    if (price <= 0) return;
+    setExtras((xs) => [...xs, { name: "إضافة", price }]);
     setExtraPrice(0);
   }
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
@@ -299,13 +297,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
               ))}
             </ul>
           )}
-          <div className="flex gap-1.5">
-            <input
-              value={extraName}
-              onChange={(e) => setExtraName(e.target.value)}
-              placeholder="نوع الإضافة (شوت، كراميل…)"
-              className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+          <div className="flex flex-wrap items-center gap-1.5">
             <PriceInput value={extraPrice} onChange={setExtraPrice} />
             <button onClick={addExtra} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
               +
