@@ -86,6 +86,15 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     fetch("http://127.0.0.1:9977/kick", { mode: "no-cors" }).catch(() => {});
   }
 
+  // Auto-print the receipt the moment an order completes. Silent one-click under
+  // the «كاشير بيزارا» shortcut (--kiosk-printing); the manual طباعة button stays
+  // as a reprint. The small delay lets the print-only receipt lay out first.
+  useEffect(() => {
+    if (!receipt) return;
+    const id = setTimeout(() => window.print(), 250);
+    return () => clearTimeout(id);
+  }, [receipt]);
+
   const lines = Object.values(cart);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const extraTotal = useMemo(() => extras.reduce((s, x) => s + x.price, 0), [extras]);
