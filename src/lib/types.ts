@@ -79,6 +79,12 @@ export type Database = {
         Update: Partial<{ phone: string | null; name_ar: string | null; points: number }>;
         Relationships: [];
       };
+      debt_entries: {
+        Row: Timestamped & { customer_name: string; phone: string | null; kind: "debit" | "credit"; amount: number; note: string | null; created_by: string | null; business_day: string };
+        Insert: { id?: string; customer_name: string; phone?: string | null; kind: "debit" | "credit"; amount: number; note?: string | null; created_by?: string | null; business_day?: string; created_at?: string };
+        Update: Partial<{ customer_name: string; phone: string | null; note: string | null }>;
+        Relationships: [];
+      };
       daily_resets: {
         Row: Timestamped & { reset_at: string; by_employee: string | null };
         Insert: { id?: string; reset_at?: string; by_employee?: string | null; created_at?: string };
@@ -187,6 +193,10 @@ export type Database = {
       };
       active_offers: {
         Row: { id: string; title: string; description: string | null };
+        Relationships: [];
+      };
+      debtor_balances: {
+        Row: { customer_name: string; phone: string | null; total_debt: number; total_paid: number; balance: number; last_activity: string };
         Relationships: [];
       };
     };

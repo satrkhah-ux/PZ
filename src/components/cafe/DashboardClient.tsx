@@ -33,6 +33,7 @@ export function DashboardClient({
   guestsToday,
   guestsRange,
   todayReset = null,
+  outstandingDebts = 0,
 }: {
   days: number;
   summary: DaySummary[];
@@ -41,6 +42,7 @@ export function DashboardClient({
   guestsToday: number;
   guestsRange: number;
   todayReset?: DaySummary | null;
+  outstandingDebts?: number;
 }) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -118,6 +120,17 @@ export function DashboardClient({
               <Kpi label="الصافي" value={formatIqdLabel(today?.net ?? 0)} highlight />
             </div>
           </section>
+
+          {/* outstanding debts — money owed to the shop, not yet collected */}
+          {outstandingDebts > 0 && (
+            <Link
+              href="/debts"
+              className="flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/5 p-4 transition hover:border-destructive/70"
+            >
+              <span className="text-sm font-semibold text-muted-foreground">💳 الديون المستحقة (غير محصّلة)</span>
+              <span className="text-xl font-extrabold tabular-nums text-destructive">{formatIqdLabel(outstandingDebts)}</span>
+            </Link>
+          )}
 
           {/* range totals + chart */}
           {days > 1 && (
