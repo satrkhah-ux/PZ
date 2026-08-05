@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, LogIn, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
+import { AtSign, Check, Globe, LogIn, MessageCircle, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
 import { getMyOrders, submitOrder, type OrderLineInput, type PublicOrder } from "@/lib/cafe/order-actions";
@@ -292,6 +292,44 @@ export function ModernMenuClient({
               </section>
             );
           })}
+
+          {/* حقوق النظام — أزرار تواصل سريع (تظهر في المنيو فقط) */}
+          <footer className="mt-6 border-t border-[#d18b4a]/15 pt-6 text-center">
+            <p className="text-[11px] text-[#f3e3cf]/45">تصميم وتطوير</p>
+            <p className="mb-3 text-sm font-bold text-[#d18b4a]">مركز الرؤية للابتكار الرقمي</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <a
+                href="https://wa.me/9647734446636"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="واتساب"
+                className="flex items-center gap-1.5 rounded-full bg-[#25D366] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              >
+                <MessageCircle className="size-4" />
+                واتساب
+              </a>
+              <a
+                href="https://instagram.com/thevision.center"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="انستغرام"
+                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90"
+              >
+                <AtSign className="size-4" />
+                انستغرام
+              </a>
+              <a
+                href="https://roya-vision.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="الموقع الإلكتروني"
+                className="flex items-center gap-1.5 rounded-full border border-[#d18b4a]/50 px-4 py-2 text-sm font-bold text-[#d18b4a] transition hover:bg-[#d18b4a]/10"
+              >
+                <Globe className="size-4" />
+                الموقع
+              </a>
+            </div>
+          </footer>
         </main>
       </div>
 
