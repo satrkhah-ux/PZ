@@ -85,9 +85,9 @@ export function TabletMenuClient({ menu }: { menu: MenuCategoryView[] }) {
                       <MenuIcon name={it.name_ar} category={cat?.name_ar} className="absolute inset-0 m-auto size-20 text-[var(--accent)] opacity-70" />
                     )}
                   </div>
-                  <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-                    <span className="text-base font-extrabold tabular-nums text-[var(--accent)]">{formatIqdLabel(it.price)}</span>
-                    <span className="truncate text-right text-[15px] font-bold">{it.name_ar}</span>
+                  <div className="px-3 py-2.5 text-right">
+                    <p className="line-clamp-2 min-h-[2.5em] text-[15px] font-bold leading-tight">{it.name_ar}</p>
+                    <p className="mt-1 text-base font-extrabold tabular-nums text-[var(--accent)]">{formatIqdLabel(it.price)}</p>
                   </div>
                 </article>
               );
@@ -96,7 +96,7 @@ export function TabletMenuClient({ menu }: { menu: MenuCategoryView[] }) {
         </main>
 
         {/* category rail (right) */}
-        <aside className="w-[168px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--panelsoft)]/60 py-2 sm:w-[196px]">
+        <aside className="w-[132px] shrink-0 overflow-y-auto border-r border-[var(--line)] bg-[var(--panelsoft)]/60 py-2 sm:w-[184px]">
           {menu.map((c) => {
             const on = c.name_ar === activeCat;
             return (
