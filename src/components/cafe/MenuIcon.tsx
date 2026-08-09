@@ -7,11 +7,12 @@
 type IconKind =
   | "espresso" | "hotcup" | "turkish" | "choco" | "karak"
   | "iced" | "icetea" | "mojito" | "frappe" | "shake" | "smoothie"
-  | "croissant" | "donut" | "cookie";
+  | "croissant" | "donut" | "cookie" | "water";
 
 export function iconKindFor(itemName: string, categoryName?: string): IconKind {
   const n = itemName;
   const c = categoryName ?? "";
+  if (n.includes("مياه") || n.includes("ماء")) return "water";
   if (n.includes("ميلك شيك")) return "shake";
   if (n.includes("سموذي")) return "smoothie";
   if (n.includes("فرابيه")) return "frappe";
@@ -132,6 +133,13 @@ const PATHS: Record<IconKind, React.ReactNode> = {
       <circle cx="19" cy="20" r="1.6" />
       <circle cx="24" cy="30" r="1.6" />
       <circle cx="30" cy="33" r="1.4" />
+    </>
+  ),
+  water: (
+    <>
+      <path d="M16 11h16l-2 27a4 4 0 0 1-4 3.5h-4a4 4 0 0 1-4-3.5z" />
+      <path d="M17 25c2-2 5-2 7 0s5 2 7 0" />
+      <path d="M17 32c2-2 5-2 7 0s5 2 7 0" />
     </>
   ),
 };

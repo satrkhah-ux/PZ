@@ -10,6 +10,7 @@ import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
 import { MenuIcon } from "./MenuIcon";
 import { PriceInput } from "./PriceInput";
+import { FridayPrayerNotice } from "./FridayPrayerNotice";
 
 type Line = {
   key: string;
@@ -204,6 +205,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     // minmax(0,1fr) + min-w-0: without them the scrollable pills row's intrinsic
     // width blows the grid past narrow POS screens (1024px) → horizontal cut.
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <FridayPrayerNotice />
       {/* items */}
       <section className="min-w-0 space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-1">
