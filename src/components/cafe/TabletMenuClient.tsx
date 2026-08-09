@@ -73,6 +73,7 @@ export function TabletMenuClient({
   // product modal (size + cross-sell)
   const [modalItem, setModalItem] = useState<MenuItemView | null>(null);
   const [modalVariant, setModalVariant] = useState<string | null>(null);
+  const [addedId, setAddedId] = useState<string | null>(null); // brief ✓ feedback on cross-sell add
 
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
   const effect = effectFor(cat?.name_ar ?? "");
@@ -87,6 +88,11 @@ export function TabletMenuClient({
     const key = `${it.id}|${variantId ?? ""}`;
     const name = it.name_ar + (v ? ` — ${v.name_ar}` : "");
     dispatch({ type: "add", line: { key, itemId: it.id, name, variantId, flavor: null, unitPrice } });
+  }
+  function addCross(p: MenuItemView) {
+    add(p, null, p.price);
+    setAddedId(p.id);
+    setTimeout(() => setAddedId((cur) => (cur === p.id ? null : cur)), 1100);
   }
   function onPlus(it: MenuItemView) {
     // size choice OR hot-drink cross-sell → open the modal; otherwise add straight
@@ -217,7 +223,14 @@ export function TabletMenuClient({
           <div style={{ ...(VARS as CSSProperties) }} className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-[var(--panelsoft)] p-5 text-[var(--text)] sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-extrabold">{modalItem.name_ar}</h2>
-              <button onClick={() => setModalItem(null)} aria-label="إغلاق" className="rounded-full border border-[var(--line)] p-1.5"><X className="size-5" /></button>
+              <div className="flex items-center gap-2">
+                {count > 0 && (
+                  <span className="flex items-center gap-1 rounded-full bg-[var(--accent)]/15 px-2.5 py-1 text-sm font-bold text-[var(--accent)]">
+                    <ShoppingCart className="size-4" /> {count}
+                  </span>
+                )}
+                <button onClick={() => setModalItem(null)} aria-label="إغلاق" className="rounded-full border border-[var(--line)] p-1.5"><X className="size-5" /></button>
+              </div>
             </div>
 
             {modalItem.variants.length > 0 && (
@@ -251,7 +264,9 @@ export function TabletMenuClient({
                         <div className="p-1.5 text-right">
                           <p className="truncate text-[11px] font-bold">{p.name_ar}</p>
                           <div className="mt-0.5 flex items-center justify-between">
-                            <button onClick={() => add(p, null, p.price)} aria-label="أضف" className="flex size-6 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--activeink)]"><Plus className="size-3.5" /></button>
+                            <button onClick={() => addCross(p)} aria-label="أضف" className={`flex size-7 items-center justify-center rounded-full transition active:scale-90 ${addedId === p.id ? "bg-emerald-500 text-white" : "bg-[var(--accent)] text-[var(--activeink)]"}`}>
+                              {addedId === p.id ? <Check className="size-4" /> : <Plus className="size-4" />}
+                            </button>
                             <span className="text-[11px] font-bold tabular-nums text-[var(--accent)]">{formatIqdLabel(p.price)}</span>
                           </div>
                         </div>

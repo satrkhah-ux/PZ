@@ -18,7 +18,10 @@ function inProhibitedWindow(): boolean {
   const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B); // equation of time (min)
   const lon = 43.3;
   const tz = 3;
-  const dhuhr = (12 + tz - lon / 15 - eot / 60) * 60; // minutes since local midnight
+  // +5 min calibration: solar-noon formula gave 12:12 vs the Ramadi adhan 12:17
+  // (2026-08-10). This constant offset (zenith→adhan convention) holds ~year-round;
+  // the formula still tracks the daily/seasonal drift.
+  const dhuhr = (12 + tz - lon / 15 - eot / 60) * 60 + 5; // minutes since local midnight
   const mins = bg.getHours() * 60 + bg.getMinutes();
   return mins >= dhuhr - 10 && mins <= dhuhr + 20;
 }
