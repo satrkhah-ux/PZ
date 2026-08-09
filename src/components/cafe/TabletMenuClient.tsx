@@ -34,11 +34,20 @@ function imgSrc(url: string | null): string | null {
   return rel.replace(/\.webp(\?|$)/, "-sm.webp$1");
 }
 
+// ambient motion per category — steam over hot, frost over cold, float on pastries
+type Effect = "hot" | "cold" | "pastry";
+function effectFor(cat: string): Effect {
+  if (cat.includes("الساخنة")) return "hot";
+  if (cat.includes("معجنات")) return "pastry";
+  return "cold";
+}
+
 export function TabletMenuClient({ menu }: { menu: MenuCategoryView[] }) {
   const [theme, setTheme] = useState<ThemeKey>("coffee");
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const t = THEMES[theme];
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
+  const effect = effectFor(cat?.name_ar ?? "");
 
   return (
     <div
@@ -77,12 +86,33 @@ export function TabletMenuClient({ menu }: { menu: MenuCategoryView[] }) {
               const src = imgSrc(it.image_url);
               return (
                 <article key={it.id} className="overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--panelsoft)]">
-                  <div className="relative aspect-[4/3] bg-[var(--panel)]">
+                  <div
+                    className="relative aspect-[4/5] bg-[var(--panel)]"
+                    style={effect === "pastry" ? { animation: "pz-float 4s ease-in-out infinite" } : undefined}
+                  >
                     {src ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={src} alt={it.name_ar} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
                       <MenuIcon name={it.name_ar} category={cat?.name_ar} className="absolute inset-0 m-auto size-20 text-[var(--accent)] opacity-70" />
+                    )}
+                    {effect === "hot" && (
+                      <div aria-hidden className="pointer-events-none absolute left-1/2 top-[22%] -translate-x-1/2">
+                        {[0, 1, 2].map((i) => (
+                          <span
+                            key={i}
+                            className="absolute block h-14 w-2 rounded-full bg-white/50 blur-[5px]"
+                            style={{ left: `${(i - 1) * 12}px`, animation: `pz-steam 2.8s ease-out ${i * 0.9}s infinite` }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {effect === "cold" && (
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0"
+                        style={{ background: "radial-gradient(120% 60% at 50% 35%, rgba(180,220,255,0.28), transparent 60%)", animation: "pz-frost 5s ease-in-out infinite" }}
+                      />
                     )}
                   </div>
                   <div className="px-3 py-2.5 text-right">
