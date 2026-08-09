@@ -7,10 +7,12 @@ import {
   createCard,
   findCard,
   adjustPoints,
+  awardForSpend,
   type FoundCard,
   type CustomerRow,
 } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
+import { PriceInput } from "./PriceInput";
 
 /** Open WhatsApp with the customer's card link prefilled — lands the card in
  *  their chat AND puts the cafe in their contacts for later marketing. */
@@ -37,6 +39,7 @@ export function LoyaltyClient({ customers, isAdmin, customerCount }: { customers
   const [scanOpen, setScanOpen] = useState(false);
   const [found, setFound] = useState<FoundCard | null>(null);
   const [delta, setDelta] = useState("");
+  const [spend, setSpend] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function onCreate(e: React.FormEvent) {
@@ -90,6 +93,19 @@ export function LoyaltyClient({ customers, isAdmin, customerCount }: { customers
     setFound({ ...found, points: res.balance });
     setDelta("");
     setMsg("تم التحديث.");
+    router.refresh();
+  }
+
+  async function awardSpend() {
+    if (!found || spend <= 0) return;
+    const res = await awardForSpend(found.id, spend);
+    if (!res.ok) {
+      setMsg(res.error);
+      return;
+    }
+    setFound({ ...found, points: res.balance });
+    setSpend(0);
+    setMsg("تم منح النقاط.");
     router.refresh();
   }
 
@@ -191,6 +207,15 @@ export function LoyaltyClient({ customers, isAdmin, customerCount }: { customers
                 <a href={`/card/${found.serial}`} target="_blank" className="mr-auto self-center text-primary underline">
                   فتح البطاقة
                 </a>
+              </div>
+              {/* quick-fill: grant points from the purchase amount */}
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background/40 p-2">
+                <span className="text-sm text-muted-foreground">أو منح نقاط بمبلغ الشراء:</span>
+                <PriceInput value={spend} onChange={setSpend} />
+                <span className="text-sm font-bold text-primary">= {Math.floor((spend || 0) / 250)} نقطة</span>
+                <button onClick={awardSpend} className="rounded-lg bg-primary px-4 py-1.5 font-semibold text-primary-foreground hover:opacity-90">
+                  منح النقاط
+                </button>
               </div>
             </div>
           )}

@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { requireStaff, requireAdmin } from "./auth";
 import { loyaltyConfig } from "./config";
+import { earnPoints } from "./points";
 
 export type Card = { id: string; name_ar: string | null; points: number };
 export type FoundCard = Card & { serial: string };
@@ -61,6 +62,15 @@ export async function adjustPoints(customerId: string, delta: number, reason = "
   if (error) return { ok: false as const, error: error.message };
   revalidatePath("/loyalty");
   return { ok: true as const, balance: data as number };
+}
+
+/** Award points for a purchase amount — floor(amount / pointsPerIqd). Lets the
+ *  cashier grant loyalty points by entering what the customer spent. */
+export async function awardForSpend(customerId: string, amountIqd: number) {
+  const cfg = loyaltyConfig();
+  const pts = earnPoints(Math.max(0, Math.round(amountIqd)), cfg.pointsPerIqd);
+  if (pts <= 0) return { ok: false as const, error: "المبلغ صغير على منح نقطة." };
+  return adjustPoints(customerId, pts);
 }
 
 /** Redeem one reward: deducts pointsPerReward, returns the discount value to apply. */
