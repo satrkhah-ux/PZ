@@ -91,6 +91,12 @@ export type Database = {
         Update: Partial<{ reset_at: string; by_employee: string | null }>;
         Relationships: [];
       };
+      item_offers: {
+        Row: Timestamped & { item_id: string; offer_price: number; business_day: string; note: string | null };
+        Insert: { id?: string; item_id: string; offer_price: number; business_day?: string; note?: string | null; created_at?: string };
+        Update: Partial<{ offer_price: number; note: string | null }>;
+        Relationships: [];
+      };
       pastry_batches: {
         Row: Timestamped & { item_name: string; quantity: number; deposited_on: string; shelf_days: number; active: boolean; note: string | null };
         Insert: { id?: string; item_name: string; quantity?: number; deposited_on?: string; shelf_days?: number; active?: boolean; note?: string | null; created_at?: string };
@@ -193,6 +199,10 @@ export type Database = {
       };
       active_offers: {
         Row: { id: string; title: string; description: string | null };
+        Relationships: [];
+      };
+      active_item_offers: {
+        Row: { item_id: string; offer_price: number };
         Relationships: [];
       };
       debtor_balances: {

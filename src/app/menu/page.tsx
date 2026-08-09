@@ -1,4 +1,5 @@
 import { getPublicMenu } from "@/lib/cafe/menu-data";
+import { getActiveItemOffers } from "@/lib/cafe/pastry-actions";
 import { TabletMenuClient } from "@/components/cafe/TabletMenuClient";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,6 @@ export default async function MenuPage({
   searchParams: Promise<{ t?: string }>;
 }) {
   const sp = await searchParams;
-  const menu = await getPublicMenu();
-  return <TabletMenuClient menu={menu} table={sp.t ?? null} channel="qr" />;
+  const [menu, offers] = await Promise.all([getPublicMenu(), getActiveItemOffers().catch(() => ({}))]);
+  return <TabletMenuClient menu={menu} table={sp.t ?? null} channel="qr" offers={offers} />;
 }

@@ -151,3 +151,50 @@ export async function getActiveOffers(): Promise<PublicOffer[]> {
   const { data } = await supabase.from("active_offers").select("id, title, description");
   return (data ?? []) as PublicOffer[];
 }
+
+// ── per-item daily offers (hot-drink pastry cross-sell) ─────────────────────
+
+export type ItemOffer = { item_id: string; name_ar: string; price: number; offer_price: number };
+
+/** Today's per-item offers as { item_id: offer_price }. Public (menu reads it). */
+export async function getActiveItemOffers(): Promise<Record<string, number>> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("active_item_offers").select("item_id, offer_price");
+  const map: Record<string, number> = {};
+  for (const r of data ?? []) map[r.item_id] = r.offer_price;
+  return map;
+}
+
+/** Set today's offer price for an item (0 = مجاناً). Staff only. */
+export async function setItemOffer(itemId: string, offerPrice: number) {
+  await requireStaff();
+  const svc = createSupabaseServiceClient();
+  const { error } = await svc
+    .from("item_offers")
+    .upsert({ item_id: itemId, offer_price: Math.max(0, Math.round(offerPrice)), business_day: businessDay() }, { onConflict: "item_id,business_day" });
+  if (error) return { ok: false as const, error: error.message };
+  revalidatePath("/pastries");
+  revalidatePath("/menu");
+  return { ok: true as const };
+}
+
+export async function clearItemOffer(itemId: string) {
+  await requireStaff();
+  const svc = createSupabaseServiceClient();
+  await svc.from("item_offers").delete().eq("item_id", itemId).eq("business_day", businessDay());
+  revalidatePath("/pastries");
+  revalidatePath("/menu");
+  return { ok: true as const };
+}
+
+/** Today's item offers with the item's name + base price (admin list). */
+export async function listTodayItemOffers(): Promise<ItemOffer[]> {
+  await requireStaff();
+  const svc = createSupabaseServiceClient();
+  const { data } = await svc.from("item_offers").select("item_id, offer_price").eq("business_day", businessDay());
+  if (!data?.length) return [];
+  const ids = data.map((d) => d.item_id);
+  const { data: items } = await svc.from("menu_items").select("id, name_ar, price").in("id", ids);
+  const byId = new Map((items ?? []).map((i) => [i.id, i]));
+  return data.map((d) => ({ item_id: d.item_id, name_ar: byId.get(d.item_id)?.name_ar ?? "؟", price: byId.get(d.item_id)?.price ?? 0, offer_price: d.offer_price }));
+}

@@ -55,10 +55,13 @@ export function TabletMenuClient({
   menu,
   table = null,
   channel = "qr",
+  offers = {},
 }: {
   menu: MenuCategoryView[];
   table?: string | null;
   channel?: "qr" | "kiosk";
+  /** item_id → today's offer price (0 = مجاناً) set by management */
+  offers?: Record<string, number>;
 }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const mainRef = useRef<HTMLElement>(null);
@@ -73,7 +76,7 @@ export function TabletMenuClient({
   // product modal (size + cross-sell)
   const [modalItem, setModalItem] = useState<MenuItemView | null>(null);
   const [modalVariant, setModalVariant] = useState<string | null>(null);
-  const [addedId, setAddedId] = useState<string | null>(null); // brief ✓ feedback on cross-sell add
+  const [crossSel, setCrossSel] = useState<Set<string>>(new Set()); // selected cross-sell pastries
 
   const cat = menu.find((c) => c.name_ar === activeCat) ?? menu[0];
   const effect = effectFor(cat?.name_ar ?? "");
@@ -89,21 +92,31 @@ export function TabletMenuClient({
     const name = it.name_ar + (v ? ` — ${v.name_ar}` : "");
     dispatch({ type: "add", line: { key, itemId: it.id, name, variantId, flavor: null, unitPrice } });
   }
-  function addCross(p: MenuItemView) {
-    add(p, null, p.price);
-    setAddedId(p.id);
-    setTimeout(() => setAddedId((cur) => (cur === p.id ? null : cur)), 1100);
+  const priceOf = (it: MenuItemView) => offers[it.id] ?? it.price; // apply today's offer if any
+  function toggleCross(id: string) {
+    setCrossSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   }
   function onPlus(it: MenuItemView) {
     // size choice OR hot-drink cross-sell → open the modal; otherwise add straight
     if (it.variants.length > 0 || effect === "hot") {
       setModalItem(it);
       setModalVariant(it.variants[0]?.id ?? null);
+      setCrossSel(new Set());
     } else {
       add(it, null, it.price);
     }
   }
   const modalPrice = modalItem ? (modalItem.variants.find((v) => v.id === modalVariant)?.price ?? modalItem.price) : 0;
+  const crossTotal = [...crossSel].reduce((s, id) => {
+    const p = pastries.find((x) => x.id === id);
+    return s + (p ? priceOf(p) : 0);
+  }, 0);
+  const grandTotal = modalPrice + crossTotal;
 
   async function checkout() {
     if (!lines.length || busy) return;
@@ -264,10 +277,17 @@ export function TabletMenuClient({
                         <div className="p-1.5 text-right">
                           <p className="truncate text-[11px] font-bold">{p.name_ar}</p>
                           <div className="mt-0.5 flex items-center justify-between">
-                            <button onClick={() => addCross(p)} aria-label="أضف" className={`flex size-7 items-center justify-center rounded-full transition active:scale-90 ${addedId === p.id ? "bg-emerald-500 text-white" : "bg-[var(--accent)] text-[var(--activeink)]"}`}>
-                              {addedId === p.id ? <Check className="size-4" /> : <Plus className="size-4" />}
+                            <button onClick={() => toggleCross(p.id)} aria-label="أضف" className={`flex size-7 items-center justify-center rounded-full transition active:scale-90 ${crossSel.has(p.id) ? "bg-emerald-500 text-white" : "bg-[var(--accent)] text-[var(--activeink)]"}`}>
+                              {crossSel.has(p.id) ? <Check className="size-4" /> : <Plus className="size-4" />}
                             </button>
-                            <span className="text-[11px] font-bold tabular-nums text-[var(--accent)]">{formatIqdLabel(p.price)}</span>
+                            {offers[p.id] !== undefined ? (
+                              <span className="text-[11px] font-bold tabular-nums">
+                                <s className="text-[var(--muted)]">{formatIqdLabel(p.price)}</s>{" "}
+                                <b className="text-emerald-400">{offers[p.id] === 0 ? "مجاناً" : formatIqdLabel(offers[p.id])}</b>
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-bold tabular-nums text-[var(--accent)]">{formatIqdLabel(p.price)}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -277,8 +297,19 @@ export function TabletMenuClient({
               </div>
             )}
 
-            <button onClick={() => { add(modalItem, modalVariant, modalPrice); setModalItem(null); }} className="w-full rounded-2xl bg-[var(--accent)] py-4 text-lg font-extrabold text-[var(--activeink)] transition active:scale-[0.99]">
-              أضف للسلة · {formatIqdLabel(modalPrice)}
+            <button
+              onClick={() => {
+                add(modalItem, modalVariant, modalPrice);
+                crossSel.forEach((id) => {
+                  const p = pastries.find((x) => x.id === id);
+                  if (p) add(p, null, priceOf(p));
+                });
+                setModalItem(null);
+                setCrossSel(new Set());
+              }}
+              className="w-full rounded-2xl bg-[var(--accent)] py-4 text-lg font-extrabold text-[var(--activeink)] transition active:scale-[0.99]"
+            >
+              أضف للسلة · {formatIqdLabel(grandTotal)}
             </button>
           </div>
         </div>

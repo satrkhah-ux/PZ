@@ -10,9 +10,14 @@ import {
   toggleOffer,
   deleteOffer,
   retireBatch,
+  setItemOffer,
+  clearItemOffer,
   type PastryBatch,
   type Offer,
+  type ItemOffer,
 } from "@/lib/cafe/pastry-actions";
+import { formatIqdLabel } from "@/lib/cafe/money";
+import { PriceInput } from "./PriceInput";
 
 const STATE_STYLE: Record<string, string> = {
   fresh: "border-emerald-500/50 bg-emerald-500/5",
@@ -20,7 +25,17 @@ const STATE_STYLE: Record<string, string> = {
   expired: "border-destructive bg-destructive/10",
 };
 
-export function PastriesClient({ batches, offers }: { batches: PastryBatch[]; offers: Offer[] }) {
+export function PastriesClient({
+  batches,
+  offers,
+  itemOffers = [],
+  pastryItems = [],
+}: {
+  batches: PastryBatch[];
+  offers: Offer[];
+  itemOffers?: ItemOffer[];
+  pastryItems?: { id: string; name_ar: string; price: number }[];
+}) {
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -31,8 +46,22 @@ export function PastriesClient({ batches, offers }: { batches: PastryBatch[]; of
 
   const [offerTitle, setOfferTitle] = useState("");
   const [offerDesc, setOfferDesc] = useState("");
+  const [offerItemId, setOfferItemId] = useState("");
+  const [offerPrice, setOfferPrice] = useState(0);
+  const [offerFree, setOfferFree] = useState(false);
 
   const alerts = batches.filter((b) => b.state !== "fresh");
+
+  async function saveItemOffer() {
+    if (!offerItemId) {
+      setMsg("اختر معجّناً.");
+      return;
+    }
+    await act(() => setItemOffer(offerItemId, offerFree ? 0 : offerPrice));
+    setOfferItemId("");
+    setOfferPrice(0);
+    setOfferFree(false);
+  }
 
   async function submitBatch(e: React.FormEvent) {
     e.preventDefault();
@@ -174,6 +203,63 @@ export function PastriesClient({ batches, offers }: { batches: PastryBatch[]; of
           )}
         </section>
       </div>
+
+      {/* daily per-item offers — shown in the hot-drink pastry cross-sell */}
+      <section className="space-y-3">
+        <h2 className="flex flex-wrap items-center gap-1.5 font-bold">
+          🎁 عروض اليوم على المعجنات
+          <span className="text-xs font-normal text-muted-foreground">(تُقترح مع المشروب الساخن — مجاناً أو بسعر تضعه)</span>
+        </h2>
+        <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4">
+          <label className="text-sm">
+            <span className="text-muted-foreground">المعجّن</span>
+            <select
+              value={offerItemId}
+              onChange={(e) => setOfferItemId(e.target.value)}
+              className="mt-1 block w-52 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">اختر معجّناً…</option>
+              {pastryItems.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name_ar} — {formatIqdLabel(p.price)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 pb-2 text-sm font-semibold">
+            <input type="checkbox" checked={offerFree} onChange={(e) => setOfferFree(e.target.checked)} className="accent-primary" />
+            مجاناً
+          </label>
+          {!offerFree && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">سعر العرض</span>
+              <div className="mt-1">
+                <PriceInput value={offerPrice} onChange={setOfferPrice} />
+              </div>
+            </div>
+          )}
+          <button onClick={saveItemOffer} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+            حفظ العرض
+          </button>
+        </div>
+        {itemOffers.length > 0 && (
+          <div className="space-y-2">
+            {itemOffers.map((o) => (
+              <div key={o.item_id} className="flex items-center justify-between rounded-xl border border-primary/40 bg-primary/5 p-3">
+                <p className="font-bold">
+                  {o.name_ar} <span className="text-sm text-muted-foreground">({formatIqdLabel(o.price)})</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">{o.offer_price === 0 ? "مجاناً" : formatIqdLabel(o.offer_price)}</span>
+                  <button onClick={() => act(() => clearItemOffer(o.item_id))} aria-label="إلغاء العرض" className="rounded-lg border border-border p-1.5 text-destructive hover:bg-secondary">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
