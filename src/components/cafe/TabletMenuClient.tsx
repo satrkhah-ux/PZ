@@ -294,6 +294,9 @@ export function TabletMenuClient({
                     );
                   })}
                 </div>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  الإضافات المختارة: <b className="tabular-nums text-[var(--accent)]">{formatIqdLabel(crossTotal)}</b>
+                </p>
               </div>
             )}
 
