@@ -188,15 +188,18 @@ export function TabletMenuClient({
                         ))}
                       </>
                     )}
+                    {/* add button floats on the image → keeps the footer clean + identical on all phones */}
+                    <button
+                      onClick={() => onPlus(it)}
+                      aria-label="أضف للسلة"
+                      className="absolute bottom-2 left-2 z-10 flex size-10 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--activeink)] shadow-lg transition active:scale-90"
+                    >
+                      <Plus className="size-5" />
+                    </button>
                   </div>
                   <div className="px-3 py-2.5 text-right">
-                    <p className="line-clamp-2 min-h-[2.5em] text-[15px] font-bold leading-tight">{it.name_ar}</p>
-                    <div className="mt-1 flex items-center justify-between">
-                      <button onClick={() => onPlus(it)} aria-label="أضف للسلة" className="flex size-9 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--activeink)] transition active:scale-90">
-                        <Plus className="size-5" />
-                      </button>
-                      <p className="text-base font-extrabold tabular-nums text-[var(--accent)]">{formatIqdLabel(it.price)}</p>
-                    </div>
+                    <p className="line-clamp-2 min-h-[2.4em] text-[15px] font-bold leading-tight">{it.name_ar}</p>
+                    <p className="mt-1 whitespace-nowrap text-lg font-extrabold tabular-nums text-[var(--accent)]">{formatIqdLabel(it.price)}</p>
                   </div>
                 </article>
               );
