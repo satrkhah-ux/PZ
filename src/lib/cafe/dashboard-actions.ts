@@ -24,6 +24,20 @@ export async function getRangeSummary(from: string, to: string): Promise<DaySumm
   return (data ?? []) as DaySummary[];
 }
 
+/** Full sales/profit rollup for a single business day (Baghdad calendar day).
+ *  `business_day` rolls at midnight, so after 12am «today» starts fresh — this
+ *  lets the owner pull yesterday's (or any date's) closing total to reconcile
+ *  the cash drawer. Admin only (reads profit → service client). */
+export async function getDaySummary(day: string): Promise<DaySummary> {
+  await requireAdmin();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("تاريخ غير صالح");
+  const svc = createSupabaseServiceClient();
+  const { data, error } = await svc.rpc("range_summary", { p_from: day, p_to: day });
+  if (error) throw new Error(error.message);
+  const row = (data ?? [])[0] as DaySummary | undefined;
+  return row ?? { day, sales: 0, orders_count: 0, profit: 0, expenses: 0, net: 0 };
+}
+
 // Baghdad is UTC+3 year-round (Iraq has no DST).
 function baghdadDayStart(): string {
   return `${businessDay()}T00:00:00+03:00`;

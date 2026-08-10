@@ -22,6 +22,25 @@ const normDigits = (s: string) => s.replace(/[٠-٩]/g, (d) => String("٠١٢٣�
 const baghdadDay = (offsetDays = 0) =>
   new Date(Date.now() + 3 * 3600e3 + offsetDays * 86400e3).toISOString().slice(0, 10);
 const agoMin = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+/** Parse a user-typed date (digits already normalized) into yyyy-MM-dd, or null.
+ *  Accepts 2026-08-10, 10/08/2026, 10-08-2026, or 10/08 (current year). Rejects
+ *  impossible dates (e.g. 31/02) and any date in the future. */
+function parseDate(s: string): string | null {
+  s = s.trim();
+  let y = "", mo = "", d = "";
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { y = m[1]; mo = m[2]; d = m[3]; }
+  else if ((m = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/))) { d = m[1]; mo = m[2]; y = m[3]; }
+  else if ((m = s.match(/^(\d{1,2})[/.\-](\d{1,2})$/))) { d = m[1]; mo = m[2]; y = baghdadDay().slice(0, 4); }
+  else return null;
+  const yy = +y, mm = +mo, dd = +d;
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const iso = `${String(yy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  const dt = new Date(`${iso}T00:00:00Z`);
+  if (isNaN(dt.getTime()) || dt.getUTCDate() !== dd || dt.getUTCMonth() + 1 !== mm) return null;
+  if (iso > baghdadDay()) return null; // no future days
+  return iso;
+}
 
 async function tg(method: string, payload: Record<string, unknown>) {
   const r = await fetch(`${API}/${method}`, {
@@ -109,6 +128,7 @@ const BACK = [{ text: "⬅️ القائمة الرئيسية", callback_data: "
 function mainMenu() {
   return [
     [{ text: "📊 اليوم", callback_data: "rpt|0" }, { text: "📅 الأسبوع", callback_data: "rpt|6" }, { text: "🗓️ الشهر", callback_data: "rpt|29" }],
+    [{ text: "📆 مبيعات أمس", callback_data: "day|1" }, { text: "🔎 مبيعات بتاريخ", callback_data: "search" }],
     [{ text: "🧾 الطلبات الآن", callback_data: "now" }, { text: "🍽️ الطاولات", callback_data: "tables" }],
     [{ text: "🔥 الأكثر والأقل مبيعاً", callback_data: "top" }, { text: "📃 مبيعات كل منتج", callback_data: "counts" }],
     [{ text: "📋 المنتجات المتاحة", callback_data: "avail" }, { text: "⚙️ إدارة المنتجات", callback_data: "pcats" }],
@@ -130,6 +150,21 @@ async function viewReport(days: number) {
   const title = days === 0 ? `اليوم ${to}` : days === 6 ? "آخر ٧ أيام" : "آخر ٣٠ يوماً";
   return [
     `☕️ <b>بيزارا كافيه — ${title}</b>`, "",
+    `🧾 الطلبات: <b>${t.c}</b>`,
+    `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
+    `📈 الأرباح: <b>${fmt(t.p)} د.ع</b>`,
+    `📉 المصروفات: <b>${fmt(t.e)} د.ع</b>`,
+    `✅ الصافي: <b>${fmt(t.n)} د.ع</b>`,
+  ].join("\n");
+}
+
+/** Full totals for one business day — for reconciling the drawer with a day that
+ *  has already rolled over past midnight (business_day is a Baghdad calendar day). */
+async function viewDaySummary(day: string) {
+  const t = sumRows(await summary(day, day));
+  const suffix = day === baghdadDay(-1) ? " (أمس)" : day === baghdadDay() ? " (اليوم)" : "";
+  return [
+    `📆 <b>مبيعات يوم ${day}${suffix}</b>`, "",
     `🧾 الطلبات: <b>${t.c}</b>`,
     `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
     `📈 الأرباح: <b>${fmt(t.p)} د.ع</b>`,
@@ -292,6 +327,15 @@ async function onMessage(msg: Row) {
   if (state) {
     await clearState(chatId);
     const text = normDigits(String(msg.text).trim());
+    if (state.action === "searchdate") {
+      const day = parseDate(text);
+      if (!day) {
+        await say(chatId, "تاريخ غير صالح — أرسل مثل: <code>2026-08-10</code> أو <code>10/08/2026</code>", [[{ text: "🔎 حاول مجدداً", callback_data: "search" }], BACK]);
+        return;
+      }
+      await say(chatId, await viewDaySummary(day), [[{ text: "🔄 تحديث", callback_data: `dayx|${day}` }], BACK]);
+      return;
+    }
     if (state.action === "price" || state.action === "cost") {
       const val = Math.round(Number(text.replace(/[^\d.]/g, "")));
       if (!Number.isFinite(val) || val < 0) { await say(chatId, "قيمة غير صالحة — أرسل رقماً مثل: 3500", [BACK]); return; }
@@ -345,6 +389,12 @@ async function onCallback(cb: Row) {
   const [cmd, a, b] = String(cb.data).split("|");
   if (cmd === "menu") return say(chatId, "☕️ <b>بيزارا كافيه — لوحة التحكم</b>\nاختر من الأزرار:", mainMenu(), mid);
   if (cmd === "rpt") return say(chatId, await viewReport(Number(a)), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
+  if (cmd === "day") return say(chatId, await viewDaySummary(baghdadDay(-Number(a))), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
+  if (cmd === "dayx") return say(chatId, await viewDaySummary(a), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
+  if (cmd === "search") {
+    await setState(chatId, { action: "searchdate" });
+    return say(chatId, "🔎 أرسل التاريخ المطلوب:\nمثال: <code>2026-08-10</code> أو <code>10/08/2026</code>", [[{ text: "إلغاء", callback_data: "menu" }]], mid);
+  }
   if (cmd === "now") return say(chatId, await viewNow(), [[{ text: "🔄 تحديث", callback_data: "now" }], BACK], mid);
   if (cmd === "tables") return say(chatId, await viewTables(), [[{ text: "🔄 تحديث", callback_data: "tables" }], BACK], mid);
   if (cmd === "final") return say(chatId, await viewDailyFinal(), [[{ text: "🔄 تحديث", callback_data: "final" }], BACK], mid);

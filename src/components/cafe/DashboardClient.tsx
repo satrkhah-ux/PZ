@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { resetDailyAccount } from "@/lib/cafe/dashboard-actions";
+import { resetDailyAccount, getDaySummary } from "@/lib/cafe/dashboard-actions";
 import {
   Area,
   AreaChart,
@@ -34,6 +34,9 @@ export function DashboardClient({
   guestsRange,
   todayReset = null,
   outstandingDebts = 0,
+  todayDate,
+  yesterday,
+  yesterdaySummary = null,
 }: {
   days: number;
   summary: DaySummary[];
@@ -43,10 +46,27 @@ export function DashboardClient({
   guestsRange: number;
   todayReset?: DaySummary | null;
   outstandingDebts?: number;
+  todayDate: string;
+  yesterday: string;
+  yesterdaySummary?: DaySummary | null;
 }) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  // «مبيعات يوم محدّد» — reconcile the drawer for a day that already rolled over.
+  const [lookupDay, setLookupDay] = useState(yesterday);
+  const [dayLookup, setDayLookup] = useState<DaySummary | null>(yesterdaySummary);
+  const [loadingDay, setLoadingDay] = useState(false);
+  async function onPickDay(d: string) {
+    if (!d) return;
+    setLookupDay(d);
+    setLoadingDay(true);
+    try {
+      setDayLookup(await getDaySummary(d));
+    } finally {
+      setLoadingDay(false);
+    }
+  }
   // TODAY card reflects the shift-settlement reset; the range/charts + bot stay full.
   const today = todayReset ?? summary[summary.length - 1];
 
@@ -119,6 +139,43 @@ export function DashboardClient({
               <Kpi label="المصروفات" value={formatIqdLabel(today?.expenses ?? 0)} />
               <Kpi label="الصافي" value={formatIqdLabel(today?.net ?? 0)} highlight />
             </div>
+          </section>
+
+          {/* «مبيعات يوم محدّد» — closing total for any past day, to reconcile the
+              cash drawer after the café stays open past midnight. Admin-only page. */}
+          <section className="space-y-2 rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                مبيعات يوم محدّد — لمطابقة الصندوق
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onPickDay(yesterday)}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold transition hover:bg-secondary"
+                >
+                  مبيعات أمس
+                </button>
+                <input
+                  type="date"
+                  value={lookupDay}
+                  max={todayDate}
+                  onChange={(e) => onPickDay(e.target.value)}
+                  className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
+                  dir="ltr"
+                  aria-label="اختر تاريخاً"
+                />
+              </div>
+            </div>
+            <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 ${loadingDay ? "opacity-50" : ""}`}>
+              <Kpi label="المبيعات" value={formatIqdLabel(dayLookup?.sales ?? 0)} />
+              <Kpi label="عدد الطلبات" value={String(dayLookup?.orders_count ?? 0)} />
+              <Kpi label="الأرباح" value={formatIqdLabel(dayLookup?.profit ?? 0)} />
+              <Kpi label="المصروفات" value={formatIqdLabel(dayLookup?.expenses ?? 0)} />
+              <Kpi label="الصافي" value={formatIqdLabel(dayLookup?.net ?? 0)} highlight />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              مبيعات اليوم المختار كاملةً — تبقى ثابتة حتى بعد منتصف الليل، فتُطابق الصندوق مع مبيعات أمس بدقّة.
+            </p>
           </section>
 
           {/* outstanding debts — money owed to the shop, not yet collected */}

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { getStaff } from "@/lib/cafe/auth";
 import { isDemoServer } from "@/lib/cafe/demo";
-import { getRangeSummary, getRecentOrders, getGuestEstimate, getTodaySinceReset, type DaySummary, type RecentOrder } from "@/lib/cafe/dashboard-actions";
+import { getRangeSummary, getRecentOrders, getGuestEstimate, getTodaySinceReset, getDaySummary, type DaySummary, type RecentOrder } from "@/lib/cafe/dashboard-actions";
 import { getMonthlyCosts } from "@/lib/cafe/expense-actions";
 import { getTotalOutstanding } from "@/lib/cafe/debt-actions";
-import { lastNDays } from "@/lib/cafe/time";
+import { lastNDays, businessDay } from "@/lib/cafe/time";
 import { DashboardClient } from "@/components/cafe/DashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +29,12 @@ export default async function DashboardPage({
   let guestsRange = 0;
   let todayReset: DaySummary | null = null;
   let outstandingDebts = 0;
+  const today = businessDay();
+  const yesterday = businessDay(new Date(Date.now() - 86_400_000));
+  let yesterdaySummary: DaySummary | null = null;
   try {
     const [from, to] = lastNDays(days);
-    const [s, r, mc, gt, gr, tr, od] = await Promise.all([
+    const [s, r, mc, gt, gr, tr, od, ys] = await Promise.all([
       getRangeSummary(from, to),
       getRecentOrders(12),
       getMonthlyCosts(),
@@ -39,6 +42,7 @@ export default async function DashboardPage({
       getGuestEstimate(from, to),
       getTodaySinceReset(),
       getTotalOutstanding(),
+      getDaySummary(yesterday),
     ]);
     summary = s;
     recent = r;
@@ -47,9 +51,10 @@ export default async function DashboardPage({
     guestsRange = gr;
     todayReset = tr;
     outstandingDebts = od;
+    yesterdaySummary = ys;
   } catch {
     // demo mode or transient DB failure — render the empty state below
   }
 
-  return <DashboardClient days={days} summary={summary} recent={recent} monthlyCosts={monthlyCosts} guestsToday={guestsToday} guestsRange={guestsRange} todayReset={todayReset} outstandingDebts={outstandingDebts} />;
+  return <DashboardClient days={days} summary={summary} recent={recent} monthlyCosts={monthlyCosts} guestsToday={guestsToday} guestsRange={guestsRange} todayReset={todayReset} outstandingDebts={outstandingDebts} todayDate={today} yesterday={yesterday} yesterdaySummary={yesterdaySummary} />;
 }
