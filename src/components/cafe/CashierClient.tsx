@@ -8,6 +8,7 @@ import { cashierCheckout } from "@/lib/cafe/cashier-actions";
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
+import { receiptStamp } from "@/lib/cafe/time";
 import { MenuIcon } from "./MenuIcon";
 import { PriceInput } from "./PriceInput";
 import { FridayPrayerNotice } from "./FridayPrayerNotice";
@@ -173,14 +174,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
         discount,
         extras,
         total,
-        dateTime: new Date().toLocaleString("en-GB", {
-          timeZone: "Asia/Baghdad",
-          hour: "2-digit",
-          minute: "2-digit",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-        }),
+        ...receiptStamp(),
       });
       if (payMethod === "cash") kickDrawer();
       setSuccess({ orderNumber: res.orderNumber, awarded: res.awarded });

@@ -10,6 +10,7 @@ import {
   type PendingOrder,
 } from "@/lib/cafe/cashier-actions";
 import { Receipt, type ReceiptData } from "./Receipt";
+import { receiptStamp } from "@/lib/cafe/time";
 
 const CHANNEL_AR: Record<string, string> = { qr: "موبايل", kiosk: "لوحي", cashier: "كاشير" };
 
@@ -27,7 +28,7 @@ function ticketFor(o: PendingOrder, heading?: string): ReceiptData {
     subtotal: o.subtotal,
     discount: 0,
     total: o.subtotal,
-    dateTime: new Date().toLocaleString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }),
+    ...receiptStamp(),
   };
 }
 
