@@ -155,7 +155,7 @@ export function HelpClient({ isAdmin }: { isAdmin: boolean }) {
       <Accordion items={tab === "cashier" ? CASHIER : ADMIN} />
 
       <p className="rounded-xl bg-secondary/60 p-3 text-center text-xs text-muted-foreground">
-        لأي مشكلة تقنية تواصل مع الدعم. بيزارا كافيه — الرمادي، العراق ☕
+        لأي مشكلة تقنية تواصل مع الدعم. بيزارا كافيه — الرمادي، شارع المستودع ☕
       </p>
     </div>
   );
