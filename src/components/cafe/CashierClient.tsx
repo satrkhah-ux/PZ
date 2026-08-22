@@ -9,6 +9,7 @@ import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
 import { receiptStamp } from "@/lib/cafe/time";
+import { ensureFreshSession, isAuthError } from "@/lib/supabase/session";
 import { MenuIcon } from "./MenuIcon";
 import { PriceInput } from "./PriceInput";
 import { FridayPrayerNotice } from "./FridayPrayerNotice";
@@ -60,6 +61,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const [loyaltyMsg, setLoyaltyMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [sessionDead, setSessionDead] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
   // cash opens the drawer; Qi-card payments happen on the Qi device — no drawer.
@@ -157,6 +159,12 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     // try/finally so the button ALWAYS unsticks — a thrown action (expired
     // session, network drop) must never freeze the cashier on «جار التنفيذ».
     try {
+      // Best-effort token renewal — the POS sits open for hours and the machine
+      // sleeps, which kills supabase-js's refresh timer. Deliberately NOT a gate:
+      // a false negative here must never stop a cashier who is actually signed in;
+      // a genuinely dead session is caught below and reported honestly.
+      await ensureFreshSession();
+      setSessionDead(false);
       const table = orderType === "dinein" ? tableNo : null;
       const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
       const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
@@ -187,8 +195,17 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       setOrderType("takeaway");
       setTableNo("");
       setOrderNote("");
-    } catch {
-      setErr("تعذّر إتمام الطلب — تأكد من الاتصال بالإنترنت وأعد المحاولة. إن تكرّر، حدّث الصفحة (F5).");
+    } catch (e) {
+      // Never swallow the cause: an expired session used to surface as a
+      // misleading "check your internet", so the cashier retried forever.
+      console.error("[checkout]", e);
+      if (isAuthError(e)) {
+        setSessionDead(true);
+        setErr("انتهت جلستك — سجّل الدخول من جديد. لم يُسجَّل أي طلب، وسلّتك محفوظة.");
+      } else {
+        const msg = e instanceof Error ? e.message : String(e);
+        setErr(`تعذّر إتمام الطلب (${msg}). راجع «الطلبات» قبل إعادة المحاولة تفادياً للتكرار، أو حدّث الصفحة (F5).`);
+      }
     } finally {
       checkoutBusyRef.current = false;
       setBusy(false);
@@ -355,7 +372,19 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
 
-        {err && <p className="text-sm text-destructive">{err}</p>}
+        {err && (
+          <div className="space-y-2">
+            <p className="text-sm text-destructive">{err}</p>
+            {sessionDead && (
+              <a
+                href="/sign-in"
+                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+              >
+                تسجيل الدخول من جديد
+              </a>
+            )}
+          </div>
+        )}
 
         {/* dine-in / takeaway */}
         <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-secondary/60 p-1.5">

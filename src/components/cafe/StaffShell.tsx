@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { startSessionKeeper } from "@/lib/supabase/session";
 import { useCafeUI } from "@/components/CafeUIProvider";
 import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
@@ -109,13 +110,15 @@ export function StaffShell({
   const bottomTabs = links.filter((l) => l.href !== "/help").slice(0, 4); // first 4 as bottom tabs, rest in «المزيد»
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // Keep the session alive on staff screens: instantiating the browser client
-  // starts supabase-js's auto-refresh loop, which renews the access token and
-  // writes it back to the cookie the server reads. Without this, server reads
-  // silently degrade to anon an hour after login.
+  // Keep the session alive on staff screens. supabase-js's own refresh loop is
+  // not enough on a POS: the machine sleeps / the tab is hidden for hours, the
+  // timer never fires, and the next server action hits an EXPIRED token — which
+  // the cashier saw as a misleading "check your internet". startSessionKeeper
+  // also refreshes on focus/visibility, so waking the screen renews the token.
   useEffect(() => {
     try {
       createSupabaseBrowserClient();
+      return startSessionKeeper();
     } catch {
       /* demo mode: no supabase env */
     }
