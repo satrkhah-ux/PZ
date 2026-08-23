@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { orderCode } from "@/lib/cafe/order-code";
+import { businessDay } from "@/lib/cafe/time";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { resetDailyAccount, getDaySummary } from "@/lib/cafe/dashboard-actions";
@@ -273,7 +275,10 @@ export function DashboardClient({
                         className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-secondary/40"
                         title="اضغط لعرض تفاصيل الطلب"
                       >
-                        <td className="px-4 py-2.5 font-semibold">{String(o.order_seq).padStart(3, "0")}</td>
+                        <td className="px-4 py-2.5 font-semibold">
+                        {String(o.order_seq).padStart(3, "0")}
+                        <span className="ms-2 text-xs font-normal text-muted-foreground">كود {orderCode(o.order_seq, businessDay(new Date(o.created_at)))}</span>
+                      </td>
                         <td className="px-4 py-2.5">{CHANNEL_AR[o.channel] ?? o.channel}</td>
                         <td className="px-4 py-2.5">{o.table_no ? `طاولة ${o.table_no}` : "—"}</td>
                         <td className="px-4 py-2.5">

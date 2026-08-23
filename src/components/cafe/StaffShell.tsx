@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { startSessionKeeper } from "@/lib/supabase/session";
+import { orderCode } from "@/lib/cafe/order-code";
+import { businessDay } from "@/lib/cafe/time";
 import { useCafeUI } from "@/components/CafeUIProvider";
 import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
@@ -141,7 +143,7 @@ export function StaffShell({
   // new-order alert on EVERY staff screen: poll pending self-orders, badge the
   // cashier nav item, and chime + toast when a fresh table order lands.
   const [pendingCount, setPendingCount] = useState(0);
-  const [toast, setToast] = useState<{ seq: number; table: string | null } | null>(null);
+  const [toast, setToast] = useState<{ code: string; table: string | null } | null>(null);
   const knownIds = useRef<Set<string> | null>(null);
   useEffect(() => {
     let stopped = false;
@@ -153,7 +155,7 @@ export function StaffShell({
         if (knownIds.current) {
           const fresh = orders.find((o) => !knownIds.current!.has(o.id));
           if (fresh) {
-            setToast({ seq: fresh.order_seq, table: fresh.table_no });
+            setToast({ code: orderCode(fresh.order_seq, businessDay(new Date(fresh.created_at))), table: fresh.table_no });
             chime();
             setTimeout(() => setToast(null), 9000);
           }
@@ -384,7 +386,7 @@ export function StaffShell({
         >
           <BellRing className="size-6 shrink-0 animate-bounce" />
           <span className="font-bold">
-            طلب جديد #{String(toast.seq).padStart(3, "0")}
+            طلب جديد #{toast.code}
             {toast.table ? ` — طاولة ${toast.table}` : ""}
           </span>
           <span className="mr-auto text-xs opacity-80">اضغط للفتح</span>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { orderCode } from "@/lib/cafe/order-code";
+import { businessDay } from "@/lib/cafe/time";
 import Link from "next/link";
 import { AtSign, Check, Globe, LogIn, MessageCircle, Minus, Plus, ReceiptText, RefreshCw, ShoppingCart, X } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
@@ -460,7 +462,7 @@ export function ModernMenuClient({
                 {myOrders.map((o) => (
                   <div key={o.id} className="rounded-xl border border-[#d18b4a]/20 bg-black/25 p-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-[#d18b4a]">#{String(o.order_seq).padStart(3, "0")}</span>
+                      <span className="font-extrabold text-[#d18b4a]">#{orderCode(o.order_seq, businessDay(new Date(o.created_at)))}</span>
                       <span className="text-xs font-semibold">{ORDER_STATUS_AR[o.status] ?? o.status}</span>
                     </div>
                     {o.table_no && <p className="mt-0.5 text-xs text-[#f3e3cf]/60">طاولة {o.table_no}</p>}

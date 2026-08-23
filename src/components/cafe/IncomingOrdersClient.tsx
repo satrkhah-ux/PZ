@@ -159,7 +159,10 @@ export function IncomingOrdersClient() {
             return (
               <div key={o.id} className="flex flex-col rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-2xl font-extrabold text-primary">#{String(o.order_seq).padStart(3, "0")}</span>
+                  <span className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-primary">#{orderCode(o.order_seq, businessDay(new Date(o.created_at)))}</span>
+                    <span className="text-xs text-muted-foreground">تسلسل {String(o.order_seq).padStart(3, "0")}</span>
+                  </span>
                   {o.table_no && (
                     <span className="rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground">طاولة {o.table_no}</span>
                   )}
