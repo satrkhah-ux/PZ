@@ -10,7 +10,8 @@ import {
   type PendingOrder,
 } from "@/lib/cafe/cashier-actions";
 import { Receipt, type ReceiptData } from "./Receipt";
-import { receiptStamp } from "@/lib/cafe/time";
+import { businessDay, receiptStamp } from "@/lib/cafe/time";
+import { orderCode } from "@/lib/cafe/order-code";
 
 const CHANNEL_AR: Record<string, string> = { qr: "موبايل", kiosk: "لوحي", cashier: "كاشير" };
 
@@ -20,7 +21,7 @@ function ageMinutes(iso: string) {
 
 function ticketFor(o: PendingOrder, heading?: string): ReceiptData {
   return {
-    orderNumber: String(o.order_seq).padStart(3, "0"),
+    orderNumber: orderCode(o.order_seq, businessDay(new Date(o.created_at))),
     heading,
     table: o.table_no,
     note: o.note,

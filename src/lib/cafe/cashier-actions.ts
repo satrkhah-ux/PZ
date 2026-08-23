@@ -6,6 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/types";
 import { requireStaff } from "./auth";
 import { loyaltyConfig } from "./config";
+import { orderCode } from "./order-code";
+import { businessDay } from "./time";
 import { earnPoints } from "./points";
 import type { OrderLineInput } from "./order-actions";
 
@@ -119,7 +121,7 @@ export async function cashierCheckout(input: {
 
   revalidatePath("/cashier");
   revalidatePath("/dashboard");
-  return { ok: true, orderNumber: String(placed[0].order_seq).padStart(3, "0"), total: paid.total, awarded: paid.awarded };
+  return { ok: true, orderNumber: orderCode(placed[0].order_seq, businessDay()), total: paid.total, awarded: paid.awarded };
 }
 
 /** Accept & pay an existing pending self-order from the queue. */

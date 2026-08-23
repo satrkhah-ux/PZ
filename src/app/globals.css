@@ -151,10 +151,17 @@ body {
   }
   .receipt-print {
     position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-    width: 80mm;
-    padding: 4mm;
+    /* PHYSICAL top/left on purpose: inset-inline-start resolves to the RIGHT in
+       this RTL document, which pushed the ticket off the printable area and cut
+       the left-hand price column. */
+    top: 0;
+    left: 0;
+    right: auto;
+    /* 72mm on 80mm paper leaves ~4mm each side, so the thermal printer's
+       non-printable edge can never eat the prices. */
+    width: 72mm;
+    box-sizing: border-box;
+    padding: 3mm 4mm;
     color: #000;
     background: #fff;
   }

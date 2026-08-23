@@ -30,32 +30,33 @@ export function Receipt({ data }: { data: ReceiptData }) {
     <div className="receipt-print hidden print:block" dir="rtl">
       {/* 80mm roll — applies only while a receipt is mounted (this style unmounts with it) */}
       <style>{`@media print { @page { size: 80mm auto; margin: 0; } }`}</style>
-      <div style={{ textAlign: "center", fontWeight: 800, fontSize: "16px" }}>بيزارا كافيه</div>
-      <div style={{ textAlign: "center", fontSize: "11px", marginBottom: "2px" }}>الرمادي - شارع المستودع</div>
+      <div style={{ textAlign: "center", fontWeight: 900, fontSize: "19px", letterSpacing: "2px" }} dir="ltr">
+        PIZZARA CAFE
+      </div>
       <div style={DASH} />
       {data.heading && (
         <div style={{ textAlign: "center", fontWeight: 800, fontSize: "13px", margin: "2px 0" }}>{data.heading}</div>
       )}
 
-      {/* الوقت كبير في منتصف الأعلى والتاريخ تحته — الكاشير يقرأهما بلمحة */}
-      <div style={{ textAlign: "center", border: "2px solid #000", borderRadius: "4px", padding: "5px 3px 6px", margin: "4px 0" }}>
-        <div style={{ fontSize: "28px", fontWeight: 900, lineHeight: "1.1" }}>{data.time}</div>
-        <div style={{ fontSize: "13px", fontWeight: 700, marginTop: "2px" }}>{data.date}</div>
+      {/* الوقت كبير في المنتصف والتاريخ تحته — بلا إطار (الإطار كان يشوّه الطباعة) */}
+      <div style={{ textAlign: "center", margin: "5px 0 6px" }}>
+        <div style={{ fontSize: "26px", fontWeight: 900, lineHeight: "1.1" }}>{data.time}</div>
+        <div style={{ fontSize: "13px", fontWeight: 700, marginTop: "1px" }}>{data.date}</div>
       </div>
 
       {data.table && (
         <div style={{ textAlign: "center", fontWeight: 800, fontSize: "15px", margin: "3px 0" }}>🍽 طاولة {data.table}</div>
       )}
       <div style={DASH} />
-      <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
+      <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", tableLayout: "fixed" }}>
         <tbody>
           {data.lines.map((l, i) => (
             <tr key={i}>
-              <td style={{ padding: "2px 0" }}>
+              <td style={{ padding: "2px 0", wordBreak: "break-word" }}>
                 {l.name}
                 {l.flavor ? ` (${l.flavor})` : ""} ×{l.qty}
               </td>
-              <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{formatIqd(l.unitPrice * l.qty)}</td>
+              <td style={{ textAlign: "left", whiteSpace: "nowrap", width: "26mm", paddingInlineStart: "2mm" }}>{formatIqd(l.unitPrice * l.qty)}</td>
             </tr>
           ))}
         </tbody>
@@ -92,12 +93,12 @@ export function Receipt({ data }: { data: ReceiptData }) {
         <span>{formatIqd(data.total)} د.ع</span>
       </div>
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0 4px" }} />
-      {/* رقم الطلب في نهاية الإيصال */}
-      <div style={{ textAlign: "center", border: "2px solid #000", borderRadius: "4px", padding: "3px 3px 4px", margin: "0 0 5px" }}>
-        <div style={{ fontSize: "11px", fontWeight: 700 }}>رقم الطلب</div>
-        <div style={{ fontSize: "26px", fontWeight: 900, lineHeight: "1.05", letterSpacing: "1px" }}>{data.orderNumber}</div>
+      {/* رقم الطلب — مصغّر، وهو كود لا يكشف عدد طلبات اليوم */}
+      <div style={{ textAlign: "center", margin: "0 0 5px", fontSize: "13px", fontWeight: 800 }}>
+        رقم الطلب: <span style={{ fontSize: "16px", fontWeight: 900, letterSpacing: "1px" }}>{data.orderNumber}</span>
       </div>
       <div style={{ textAlign: "center", fontSize: "11px" }}>شكراً لزيارتكم ❤</div>
+      <div style={{ textAlign: "center", fontSize: "11px", fontWeight: 700, marginTop: "3px" }}>الرمادي - شارع المستودع</div>
       <div style={{ borderTop: "1px dashed #000", margin: "4px 0 3px" }} />
       <div style={{ textAlign: "center", fontSize: "9px", lineHeight: "1.5" }}>
         نظام الرؤية المتطور لإدارة الكافيهات

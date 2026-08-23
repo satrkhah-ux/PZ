@@ -1,6 +1,8 @@
 "use server";
 
 import { isDemoServer } from "./demo";
+import { businessDay } from "./time";
+import { orderCode } from "./order-code";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendNewOrderPush } from "./push";
 import type { Json } from "@/lib/types";
@@ -35,7 +37,7 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
 
   if (isDemoServer()) {
     const n = Math.floor(Math.random() * 900 + 100);
-    return { ok: true, orderNumber: String(n).padStart(3, "0") };
+    return { ok: true, orderNumber: orderCode(n, businessDay()) };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -69,7 +71,7 @@ export async function submitOrder(input: SubmitOrderInput): Promise<SubmitOrderR
     table: input.table?.trim() || null,
     count: input.lines.reduce((s, l) => s + l.qty, 0),
   });
-  return { ok: true, orderNumber: String(data[0].order_seq).padStart(3, "0"), orderId: data[0].order_id, cardSerial };
+  return { ok: true, orderNumber: orderCode(data[0].order_seq, businessDay()), orderId: data[0].order_id, cardSerial };
 }
 
 export type PublicOrderItem = { name_ar: string; flavor_ar: string | null; qty: number; unit_price: number; line_total: number };
