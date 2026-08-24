@@ -166,10 +166,31 @@ export function StaffShell({
       }
     }
     tick();
-    const t = setInterval(tick, 10000);
+    // 25s and paused while the tab is hidden — this runs on EVERY staff screen,
+    // so it was the single biggest source of idle serverless usage.
+    let timer: number | undefined;
+    const run = () => {
+      if (!stopped && document.visibilityState === "visible") void tick();
+    };
+    const start = () => {
+      if (timer === undefined) timer = window.setInterval(run, 25_000);
+    };
+    const stop = () => {
+      if (timer !== undefined) window.clearInterval(timer);
+      timer = undefined;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        run();
+        start();
+      } else stop();
+    };
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       stopped = true;
-      clearInterval(t);
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

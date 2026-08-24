@@ -12,6 +12,7 @@ import {
 import { Receipt, type ReceiptData } from "./Receipt";
 import { businessDay, receiptStamp } from "@/lib/cafe/time";
 import { orderCode } from "@/lib/cafe/order-code";
+import { usePoll } from "@/lib/cafe/use-poll";
 
 const CHANNEL_AR: Record<string, string> = { qr: "موبايل", kiosk: "لوحي", cashier: "كاشير" };
 
@@ -97,12 +98,9 @@ export function IncomingOrdersClient() {
       /* ignore transient errors */
     }
   }, []);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state is set after an await
-    refreshPending();
-    const t = setInterval(refreshPending, 5000);
-    return () => clearInterval(t);
-  }, [refreshPending]);
+  // 12s and paused while hidden: at 5s an always-open screen cost ~10k serverless
+  // calls a day, which is what drained the hosting credits.
+  usePoll(refreshPending, 12_000);
 
   async function accept(id: string, method: "cash" | "card") {
     setQueueErr(null);

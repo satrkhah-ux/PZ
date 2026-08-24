@@ -35,7 +35,7 @@ export function TablesClient() {
     if (editing) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- polling an external system; state is set after an await
     refresh();
-    const t = setInterval(refresh, 15000);
+    const t = setInterval(() => { if (document.visibilityState === "visible") refresh(); }, 25000);
     return () => clearInterval(t);
   }, [refresh, editing]);
 
