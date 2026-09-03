@@ -115,3 +115,30 @@ export async function setPrepStatus(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+/* ————— idle showcase: the cafe's own products ————— */
+
+export type ShowcaseItem = { name: string; image: string; price: number; category: string };
+
+/**
+ * Pictures for the idle screen, read from the cost-free `menu_public` view.
+ * Deterministic order so the server's first paint and the browser agree on which
+ * slide is showing — the whole screen derives "which slide" from the clock.
+ */
+export async function listShowcase(): Promise<ShowcaseItem[]> {
+  const supabase = createSupabaseServiceClient();
+  const { data, error } = await supabase
+    .from("menu_public")
+    .select("name_ar, image_url, price, category_name, category_sort, sort")
+    .order("category_sort", { ascending: true })
+    .order("sort", { ascending: true });
+  if (error || !data) return [];
+  return data
+    .filter((r) => !!r.image_url)
+    .map((r) => ({
+      name: r.name_ar,
+      image: String(r.image_url),
+      price: Number(r.price ?? 0),
+      category: r.category_name ?? "",
+    }));
+}

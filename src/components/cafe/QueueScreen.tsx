@@ -1,4 +1,4 @@
-import { canViewQueue, listQueue } from "@/lib/cafe/queue-actions";
+import { canViewQueue, listQueue, listShowcase } from "@/lib/cafe/queue-actions";
 import { QueueDisplayClient } from "./QueueDisplayClient";
 
 /**
@@ -15,11 +15,12 @@ export async function QueueScreen({ displayKey }: { displayKey: string }) {
   // loop on a public URL.
   if (!(await canViewQueue(displayKey))) {
     return (
-      <main dir="rtl" className="flex h-dvh items-center justify-center p-8" style={{ background: "#0b0b0d", color: "#f4f1ea" }}>
-        <div className="max-w-md rounded-3xl p-8 text-center" style={{ border: "1px solid rgba(255,255,255,.12)" }}>
-          <div className="text-2xl font-black tracking-[3px]" dir="ltr">PIZZARA CAFE</div>
+      <main dir="rtl" className="flex h-dvh items-center justify-center p-8" style={{ background: "radial-gradient(120% 90% at 50% -10%, #1b1009, #120a05 70%)", color: "#f6ead9" }}>
+        <div className="max-w-md rounded-3xl p-8 text-center" style={{ border: "1px solid rgba(209,139,74,.35)" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="بيزارا كافيه" style={{ height: 84, width: "auto", margin: "0 auto", objectFit: "contain" }} />
           <p className="mt-4 text-lg font-bold">شاشة الاستلام</p>
-          <p className="mt-2 text-sm leading-7" style={{ color: "rgba(244,241,234,.55)" }}>
+          <p className="mt-2 text-sm leading-7" style={{ color: "rgba(246,234,217,.6)" }}>
             هذا الرابط يحتاج مفتاح عرض صحيح. راجع الإدارة للحصول على الرابط الكامل.
           </p>
         </div>
@@ -29,6 +30,9 @@ export async function QueueScreen({ displayKey }: { displayKey: string }) {
 
   // A failure here must degrade to an empty board, never to a red error page that
   // would stay frozen on the wall all night.
-  const rows = await listQueue().catch(() => []);
-  return <QueueDisplayClient initialRows={rows} />;
+  const [rows, showcase] = await Promise.all([
+    listQueue().catch(() => []),
+    listShowcase().catch(() => []),
+  ]);
+  return <QueueDisplayClient initialRows={rows} showcase={showcase} />;
 }

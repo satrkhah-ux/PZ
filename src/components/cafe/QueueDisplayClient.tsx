@@ -2,18 +2,19 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { listQueue } from "@/lib/cafe/queue-actions";
-import { fitColumn, justWentReady, pageNow, pageSlice, splitColumns, type QueueRow } from "@/lib/cafe/queue-display";
+import { listQueue, type ShowcaseItem } from "@/lib/cafe/queue-actions";
+import { fitColumn, justWentReady, pageNow, pageSlice, slideNow, splitColumns, type QueueRow } from "@/lib/cafe/queue-display";
 
 const POLL_MS = 15_000; // backup for a dead realtime socket
-const ROTATE_S = 8; // seconds a column page stays before rotating
-const IDLE_ROTATE_S = 10;
+const ROTATE_S = 8; // a column page holds this long before rotating
+const SLIDE_S = 7; // an idle slide holds this long
 
-const IDLE_SLIDES = [
-  { big: "بيزارا كافيه", small: "الرمادي — شارع المستودع" },
-  { big: "اطلب من طاولتك", small: "امسح رمز QR الموجود على الطاولة" },
-  { big: "أهلاً بكم", small: "نتمنى لكم وقتاً طيباً" },
-];
+/* ————— café identity (the coffee palette used across the app) ————— */
+const INK = "#f6ead9"; // cream
+const ESPRESSO = "#1b1009";
+const ESPRESSO_2 = "#120a05";
+const CARAMEL = "#d18b4a";
+const GOLD = "#e6a862";
 
 function chime() {
   try {
@@ -40,70 +41,117 @@ function chime() {
   }
 }
 
+function Logo({ size }: { size: number }) {
+  // eslint-disable-next-line @next/next/no-img-element -- signage screen; the menu uses plain <img> too
+  return <img src="/logo.png" alt="بيزارا كافيه" width={size} height={size} style={{ height: size, width: "auto", objectFit: "contain" }} />;
+}
+
+/** One order card. «جاهز» is the loud one — it is an instruction to walk over. */
+function Card({ row, font, label, ready }: { row: QueueRow; font: number; label: number; ready: boolean }) {
+  return (
+    <div
+      className="relative flex h-full min-h-0 flex-col items-center justify-center rounded-3xl"
+      style={{
+        background: ready ? `linear-gradient(150deg, ${GOLD}, ${CARAMEL})` : "rgba(255,255,255,.045)",
+        border: ready ? "none" : `2px solid ${CARAMEL}55`,
+        color: ready ? ESPRESSO_2 : GOLD,
+        boxShadow: ready ? `0 0 0 4px ${CARAMEL}33, 0 18px 40px -16px ${CARAMEL}aa` : "none",
+        animation: ready ? "qIn .4s cubic-bezier(.22,1,.36,1) both, qPulse 2.6s ease-in-out infinite .4s" : "qIn .4s cubic-bezier(.22,1,.36,1) both",
+      }}
+    >
+      <span className="tabular-nums" style={{ fontSize: font, fontWeight: 900, lineHeight: 1, letterSpacing: 2 }}>
+        {row.code}
+      </span>
+      {row.table_no && (
+        <span
+          className="absolute rounded-full px-2.5 py-0.5 font-bold"
+          style={{
+            top: 10,
+            insetInlineEnd: 10,
+            fontSize: Math.max(12, label - 6),
+            background: ready ? "rgba(0,0,0,.18)" : `${CARAMEL}22`,
+            color: ready ? ESPRESSO_2 : GOLD,
+          }}
+        >
+          طاولة {row.table_no}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Column({
   title,
   rows,
-  accent,
+  ready,
   availH,
-  extraCols,
+  availW,
   now,
 }: {
   title: string;
   rows: QueueRow[];
-  accent: string;
+  ready: boolean;
   availH: number;
-  extraCols: number;
+  availW: number;
   now: number;
 }) {
+  const extraCols = ready ? 1 : 0;
   const { tier, perPage, pages } = fitColumn(rows.length, availH, extraCols);
   const page = pageNow(rows.length, perPage, ROTATE_S, now);
   const visible = pageSlice(rows, perPage, page);
   const cols = Math.max(1, tier.cols + extraCols);
+  const accent = ready ? GOLD : `${INK}99`;
+
+  // The tier decides how many fit; the rows then SHARE the whole column height so
+  // a near-empty board still fills the wall. Grow the digits with the real row
+  // height (capped) — on a TV across a hall, bigger is the whole point.
+  const rowsUsed = Math.max(1, Math.ceil(Math.max(visible.length, 1) / cols));
+  const rowH = Math.max(1, (availH - 14 * (rowsUsed - 1)) / rowsUsed);
+  const cardW = Math.max(1, (availW - 14 * (cols - 1)) / cols);
+  // Cap by BOTH axes: sized on height alone, a 3-digit code overflowed its card
+  // sideways and the two ready numbers ran into each other. ~2.1em holds 3 digits
+  // plus the letter-spacing.
+  const byHeight = rowH * 0.52;
+  const byWidth = (cardW * 0.88) / 2.1;
+  const font = Math.round(Math.max(28, Math.min(tier.font * 1.9, byHeight, byWidth)));
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <h2 className="mb-3 flex items-center justify-between px-1" style={{ fontSize: tier.label + 6 }}>
-        <span className="font-black" style={{ color: accent }}>
-          {title}
+      <h2 className="mb-4 flex items-center justify-between gap-3 px-1">
+        <span className="flex items-center gap-3">
+          <span
+            className="block rounded-full"
+            style={{ width: 14, height: 14, background: ready ? GOLD : `${CARAMEL}66`, boxShadow: ready ? `0 0 14px ${GOLD}` : "none" }}
+          />
+          <span style={{ color: accent, fontSize: 34, fontWeight: 900 }}>{title}</span>
         </span>
         <span className="flex items-center gap-3">
           {pages > 1 && (
             <span className="flex gap-1.5" aria-hidden>
               {Array.from({ length: pages }).map((_, i) => (
-                <span key={i} className="block rounded-full" style={{ width: 10, height: 10, background: i === page ? accent : "rgba(255,255,255,.22)" }} />
+                <span key={i} className="block rounded-full" style={{ width: 10, height: 10, background: i === page ? GOLD : `${INK}30` }} />
               ))}
             </span>
           )}
-          <span className="font-bold tabular-nums" style={{ color: "rgba(255,255,255,.45)", fontSize: Math.max(12, tier.label - 4) }}>
+          <span className="tabular-nums" style={{ color: `${INK}55`, fontSize: 26, fontWeight: 800 }}>
             {rows.length}
           </span>
         </span>
       </h2>
 
-      <div className="grid min-h-0 flex-1 content-start" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gap: 12 }}>
+      <div
+        className="grid min-h-0 flex-1"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`,
+          gridTemplateRows: `repeat(${rowsUsed}, minmax(0,1fr))`,
+          gap: 14,
+        }}
+      >
         {visible.map((r) => (
-          <div
-            key={r.id}
-            className="flex items-center justify-center rounded-2xl"
-            style={{
-              height: tier.cardH,
-              background: accent,
-              color: "#0b0b0d",
-              fontSize: tier.font,
-              fontWeight: 900,
-              lineHeight: 1,
-              letterSpacing: 1,
-              animation: "qIn .35s cubic-bezier(.22,1,.36,1) both",
-            }}
-          >
-            <span className="tabular-nums">{r.code}</span>
-          </div>
+          <Card key={r.id} row={r} font={font} label={tier.label} ready={ready} />
         ))}
         {rows.length === 0 && (
-          <div
-            className="flex items-center justify-center rounded-2xl border-2 border-dashed"
-            style={{ height: tier.cardH, borderColor: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.3)", fontSize: tier.label }}
-          >
+          <div className="flex items-center justify-center rounded-3xl" style={{ border: `2px dashed ${INK}18`, color: `${INK}30`, fontSize: 28 }}>
             —
           </div>
         )}
@@ -112,10 +160,66 @@ function Column({
   );
 }
 
-export function QueueDisplayClient({ initialRows }: { initialRows: QueueRow[] }) {
+/** Idle: the logo/welcome slide, then the café's own products one at a time. */
+function Idle({ items, now }: { items: ShowcaseItem[]; now: number }) {
+  const total = items.length + 1; // slide 0 is the welcome
+  const idx = slideNow(total, SLIDE_S, now);
+  const item = idx === 0 ? null : items[idx - 1];
+
+  // Preload ONLY the next picture. Rendering all of them at opacity 0 would pull
+  // megabytes over shop wifi on a page that rebuilds itself, and then nothing
+  // finishes loading at all.
+  useEffect(() => {
+    const next = items[idx === 0 ? 0 : idx % items.length];
+    if (!next) return;
+    const img = new Image();
+    img.src = next.image;
+  }, [idx, items]);
+
+  if (!item) {
+    return (
+      <div key="welcome" className="flex flex-1 flex-col items-center justify-center px-8 text-center" style={{ animation: "slideIn .8s ease both" }}>
+        <Logo size={230} />
+        <div className="mt-8 font-black leading-tight" style={{ fontSize: "clamp(3rem,8vw,6rem)", color: INK }}>
+          أهلاً بكم
+        </div>
+        <div className="mt-3" style={{ fontSize: "clamp(1.1rem,2.2vw,1.9rem)", color: `${INK}80` }}>
+          اطلب من طاولتك بمسح رمز QR
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={item.image} className="relative flex-1 overflow-hidden" style={{ animation: "slideIn .9s ease both" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- signage screen */}
+      <img
+        src={item.image}
+        alt={item.name}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ animation: "kenBurns 8s ease-out both" }}
+      />
+      <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${ESPRESSO_2} 6%, ${ESPRESSO_2}cc 28%, transparent 62%)` }} />
+      <div className="absolute inset-x-0 bottom-0 p-12 text-center" style={{ animation: "riseIn .9s .25s ease both" }}>
+        <div style={{ color: GOLD, fontSize: "clamp(1rem,1.8vw,1.5rem)", fontWeight: 800, letterSpacing: 2 }}>{item.category}</div>
+        <div className="mt-2 font-black leading-tight" style={{ fontSize: "clamp(2.6rem,6.5vw,5rem)", color: INK }}>
+          {item.name}
+        </div>
+        {item.price > 0 && (
+          <div className="mt-3 inline-block rounded-full px-7 py-2" style={{ background: `linear-gradient(150deg, ${GOLD}, ${CARAMEL})`, color: ESPRESSO_2, fontSize: "clamp(1.2rem,2.4vw,2rem)", fontWeight: 900 }}>
+            {item.price.toLocaleString("en-US")} د.ع
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function QueueDisplayClient({ initialRows, showcase }: { initialRows: QueueRow[]; showcase: ShowcaseItem[] }) {
   const [rows, setRows] = useState<QueueRow[]>(initialRows);
   const [now, setNow] = useState<number>(() => Date.now());
   const [availH, setAvailH] = useState(420);
+  const [availW, setAvailW] = useState(900);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const prevReady = useRef<string[]>(initialRows.filter((r) => r.prep_status === "ready").map((r) => r.id));
 
@@ -158,7 +262,7 @@ export function QueueDisplayClient({ initialRows }: { initialRows: QueueRow[] })
     return () => window.clearInterval(t);
   }, [refresh]);
 
-  // 3) the clock that drives rotation — local only, never a server call
+  // 3) the clock that drives every rotation — local only, never a server call
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
@@ -168,7 +272,12 @@ export function QueueDisplayClient({ initialRows }: { initialRows: QueueRow[] })
   useLayoutEffect(() => {
     const el = gaugeRef.current;
     if (!el) return;
-    const measure = () => setAvailH(Math.max(90, Math.floor(el.getBoundingClientRect().height)));
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      setAvailH(Math.max(90, Math.floor(r.height)));
+      // each column gets half the gauge minus the divider and the gap between them
+      setAvailW(Math.max(120, Math.floor((r.width - 32 - 1) / 2)));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -181,43 +290,43 @@ export function QueueDisplayClient({ initialRows }: { initialRows: QueueRow[] })
 
   const { preparing, ready } = splitColumns(rows);
   const idle = rows.length === 0;
-  const slide = IDLE_SLIDES[Math.floor(now / (IDLE_ROTATE_S * 1000)) % IDLE_SLIDES.length];
 
   return (
-    <main dir="rtl" className="relative flex h-dvh flex-col overflow-hidden" style={{ background: "#0b0b0d", color: "#f4f1ea" }}>
+    <main
+      dir="rtl"
+      className="relative flex h-dvh flex-col overflow-hidden"
+      style={{ background: `radial-gradient(120% 90% at 50% -10%, ${ESPRESSO}, ${ESPRESSO_2} 70%)`, color: INK }}
+    >
       <style>{`
-        @keyframes qIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+        @keyframes qIn { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+        @keyframes qPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.022); } }
+        @keyframes slideIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes riseIn { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+        @keyframes kenBurns { from { transform: scale(1.02) translate3d(0,0,0); } to { transform: scale(1.14) translate3d(0,-1.5%,0); } }
         @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
       `}</style>
 
-      <header className="flex flex-none items-center justify-between px-8 pb-3 pt-6">
-        <div className="text-3xl font-black tracking-[3px]" dir="ltr">
-          PIZZARA CAFE
-        </div>
-        <div className="text-xl font-bold tabular-nums" style={{ color: "rgba(244,241,234,.55)" }}>
+      <header className="flex flex-none items-center justify-between px-10 pb-3 pt-6">
+        <div className="tabular-nums" style={{ color: `${INK}55`, fontSize: 26, fontWeight: 800 }}>
           {new Date(now).toLocaleTimeString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", hour12: false })}
         </div>
+        <Logo size={64} />
       </header>
 
       {idle ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-          <div className="text-[clamp(3rem,9vw,7rem)] font-black leading-tight">{slide.big}</div>
-          <div className="mt-4 text-[clamp(1.1rem,2.4vw,2rem)]" style={{ color: "rgba(244,241,234,.55)" }}>
-            {slide.small}
-          </div>
-        </div>
+        <Idle items={showcase} now={now} />
       ) : (
-        <div className="flex min-h-0 flex-1 gap-6 px-8 pb-8">
-          {/* RTL: «تحت التحضير» is read first (right); «جاهز» sits left */}
-          <Column title="تحت التحضير" rows={preparing} accent="#c9a24b" availH={availH} extraCols={0} now={now} />
-          <div className="w-px flex-none self-stretch" style={{ background: "rgba(255,255,255,.1)" }} />
-          <Column title="جاهز للاستلام" rows={ready} accent="#2ecc71" availH={availH} extraCols={1} now={now} />
+        <div className="flex min-h-0 flex-1 gap-8 px-10 pb-10">
+          {/* RTL: «تحت التحضير» is read first (right); «جاهز» sits left and shouts */}
+          <Column title="تحت التحضير" rows={preparing} ready={false} availH={availH} availW={availW} now={now} />
+          <div className="w-px flex-none self-stretch" style={{ background: `${CARAMEL}33` }} />
+          <Column title="جاهز للاستلام" rows={ready} ready availH={availH} availW={availW} now={now} />
         </div>
       )}
 
       {/* EMPTY on purpose: what is measured must not depend on what goes inside it,
           or measuring would change the very layout being measured. */}
-      <div ref={gaugeRef} aria-hidden className="pointer-events-none absolute inset-x-8" style={{ top: 92, bottom: 32, visibility: "hidden" }} />
+      <div ref={gaugeRef} aria-hidden className="pointer-events-none absolute inset-x-10" style={{ top: 122, bottom: 40, visibility: "hidden" }} />
     </main>
   );
 }
