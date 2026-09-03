@@ -160,57 +160,102 @@ function Column({
   );
 }
 
-/** Idle: the logo/welcome slide, then the café's own products one at a time. */
-function Idle({ items, now }: { items: ShowcaseItem[]; now: number }) {
-  const total = items.length + 1; // slide 0 is the welcome
-  const idx = slideNow(total, SLIDE_S, now);
-  const item = idx === 0 ? null : items[idx - 1];
+/** Welcome cards, shown AFTER the products — each over one of the café's photos. */
+const MESSAGES: { big: string; small: string }[] = [
+  { big: "أهلاً بكم", small: "نتمنى لكم وقتاً طيباً في بيزارا كافيه" },
+  { big: "اطلب من طاولتك", small: "قرّب هاتفك من الشعار الموجود على طاولتك" },
+  { big: "بيزارا كافيه", small: "الرمادي — شارع المستودع" },
+];
 
-  // Preload ONLY the next picture. Rendering all of them at opacity 0 would pull
+type Slide =
+  | { kind: "product"; item: ShowcaseItem }
+  | { kind: "message"; big: string; small: string; image: string };
+
+function buildSlides(items: ShowcaseItem[]): Slide[] {
+  const products: Slide[] = items.map((item) => ({ kind: "product", item }));
+  // Messages come after the products and borrow a photo each, spread across the
+  // catalogue so the same picture is not reused back to back.
+  const messages: Slide[] = MESSAGES.map((m, i) => ({
+    kind: "message",
+    ...m,
+    image: items.length ? items[Math.floor((i * items.length) / MESSAGES.length)].image : "",
+  }));
+  return [...products, ...messages];
+}
+
+/** Idle: the café's own products one at a time, then the welcome cards. */
+function Idle({ items, now }: { items: ShowcaseItem[]; now: number }) {
+  const slides = buildSlides(items);
+  const idx = slideNow(Math.max(slides.length, 1), SLIDE_S, now);
+  const slide = slides[idx];
+
+  // Preload ONLY the next picture. Rendering them all at opacity 0 would pull
   // megabytes over shop wifi on a page that rebuilds itself, and then nothing
   // finishes loading at all.
   useEffect(() => {
-    const next = items[idx === 0 ? 0 : idx % items.length];
-    if (!next) return;
+    const next = slides[(idx + 1) % Math.max(slides.length, 1)];
+    const src = next ? (next.kind === "product" ? next.item.image : next.image) : "";
+    if (!src) return;
     const img = new Image();
-    img.src = next.image;
-  }, [idx, items]);
+    img.src = src;
+  }, [idx, slides]);
 
-  if (!item) {
+  if (!slide) {
     return (
-      <div key="welcome" className="flex flex-1 flex-col items-center justify-center px-8 text-center" style={{ animation: "slideIn .8s ease both" }}>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
         <Logo size={230} />
         <div className="mt-8 font-black leading-tight" style={{ fontSize: "clamp(3rem,8vw,6rem)", color: INK }}>
           أهلاً بكم
-        </div>
-        <div className="mt-3" style={{ fontSize: "clamp(1.1rem,2.2vw,1.9rem)", color: `${INK}80` }}>
-          اطلب من طاولتك بمسح رمز QR
         </div>
       </div>
     );
   }
 
+  const src = slide.kind === "product" ? slide.item.image : slide.image;
+  const message = slide.kind === "message";
+
   return (
-    <div key={item.image} className="relative flex-1 overflow-hidden" style={{ animation: "slideIn .9s ease both" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- signage screen */}
-      <img
-        src={item.image}
-        alt={item.name}
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ animation: "kenBurns 8s ease-out both" }}
-      />
-      <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${ESPRESSO_2} 6%, ${ESPRESSO_2}cc 28%, transparent 62%)` }} />
-      <div className="absolute inset-x-0 bottom-0 p-12 text-center" style={{ animation: "riseIn .9s .25s ease both" }}>
-        <div style={{ color: GOLD, fontSize: "clamp(1rem,1.8vw,1.5rem)", fontWeight: 800, letterSpacing: 2 }}>{item.category}</div>
-        <div className="mt-2 font-black leading-tight" style={{ fontSize: "clamp(2.6rem,6.5vw,5rem)", color: INK }}>
-          {item.name}
-        </div>
-        {item.price > 0 && (
-          <div className="mt-3 inline-block rounded-full px-7 py-2" style={{ background: `linear-gradient(150deg, ${GOLD}, ${CARAMEL})`, color: ESPRESSO_2, fontSize: "clamp(1.2rem,2.4vw,2rem)", fontWeight: 900 }}>
-            {item.price.toLocaleString("en-US")} د.ع
+    <div key={`${idx}-${src}`} className="relative flex-1 overflow-hidden" style={{ animation: "slideIn .9s ease both" }}>
+      {src && (
+        // eslint-disable-next-line @next/next/no-img-element -- signage screen
+        <img
+          src={src}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          // The café's product photos are shot dark on dark; straight out of the
+          // bucket they read as a muddy brown wall from across the room.
+          style={{ animation: "kenBurns 8s ease-out both", filter: "brightness(1.45) contrast(1.12) saturate(1.08)" }}
+        />
+      )}
+
+      {message ? (
+        <>
+          {/* a message must stay readable, so its photo sits further back */}
+          <div className="absolute inset-0" style={{ background: `${ESPRESSO_2}b8` }} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center" style={{ animation: "riseIn .9s .2s ease both" }}>
+            <Logo size={180} />
+            <div className="mt-7 font-black leading-tight" style={{ fontSize: "clamp(3rem,8vw,6rem)", color: INK, textShadow: "0 4px 30px rgba(0,0,0,.6)" }}>
+              {slide.big}
+            </div>
+            <div className="mt-3" style={{ fontSize: "clamp(1.2rem,2.4vw,2rem)", color: `${INK}cc`, textShadow: "0 2px 18px rgba(0,0,0,.6)" }}>
+              {slide.small}
+            </div>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <>
+          {/* only the lower third is darkened, so the drink itself stays visible */}
+          <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${ESPRESSO_2}f2 0%, ${ESPRESSO_2}99 22%, transparent 46%)` }} />
+          <div className="absolute inset-x-0 bottom-0 p-12 text-center" style={{ animation: "riseIn .9s .25s ease both" }}>
+            <div style={{ color: GOLD, fontSize: "clamp(1rem,1.8vw,1.5rem)", fontWeight: 800, letterSpacing: 2, textShadow: "0 2px 14px rgba(0,0,0,.7)" }}>
+              {slide.item.category}
+            </div>
+            <div className="mt-2 font-black leading-tight" style={{ fontSize: "clamp(2.6rem,6.5vw,5rem)", color: INK, textShadow: "0 4px 26px rgba(0,0,0,.75)" }}>
+              {slide.item.name}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
