@@ -125,6 +125,9 @@ export type ShowcaseItem = { name: string; image: string; category: string };
  *  served under whipped cream — edit this list to change what the screen shows. */
 const SHOWCASE_EXCLUDED_CATEGORIES = ["فرابيه", "ميلك شيك"];
 
+/** Individual items not worth a full-screen slide (water is a staple, not a feature). */
+const SHOWCASE_EXCLUDED_ITEMS = ["مياه"];
+
 /**
  * Pictures for the idle screen, read from the cost-free `menu_public` view.
  * Deterministic order so the server's first paint and the browser agree on which
@@ -141,6 +144,7 @@ export async function listShowcase(): Promise<ShowcaseItem[]> {
   return data
     .filter((r) => !!r.image_url)
     .filter((r) => !SHOWCASE_EXCLUDED_CATEGORIES.includes(String(r.category_name ?? "").trim()))
+    .filter((r) => !SHOWCASE_EXCLUDED_ITEMS.includes(String(r.name_ar ?? "").trim()))
     .map((r) => ({
       name: r.name_ar,
       image: String(r.image_url),
