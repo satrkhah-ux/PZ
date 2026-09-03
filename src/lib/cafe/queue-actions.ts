@@ -121,6 +121,10 @@ export async function setPrepStatus(
 /** Owner: the hall screen must NOT show prices. */
 export type ShowcaseItem = { name: string; image: string; category: string };
 
+/** Owner: no cream-topped drinks on the hall screen. These are the categories
+ *  served under whipped cream — edit this list to change what the screen shows. */
+const SHOWCASE_EXCLUDED_CATEGORIES = ["فرابيه", "ميلك شيك"];
+
 /**
  * Pictures for the idle screen, read from the cost-free `menu_public` view.
  * Deterministic order so the server's first paint and the browser agree on which
@@ -136,6 +140,7 @@ export async function listShowcase(): Promise<ShowcaseItem[]> {
   if (error || !data) return [];
   return data
     .filter((r) => !!r.image_url)
+    .filter((r) => !SHOWCASE_EXCLUDED_CATEGORIES.includes(String(r.category_name ?? "").trim()))
     .map((r) => ({
       name: r.name_ar,
       image: String(r.image_url),
