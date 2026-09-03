@@ -121,9 +121,9 @@ function Column({
         <span className="flex items-center gap-3">
           <span
             className="block rounded-full"
-            style={{ width: 14, height: 14, background: ready ? GOLD : `${CARAMEL}66`, boxShadow: ready ? `0 0 14px ${GOLD}` : "none" }}
+            style={{ width: "clamp(9px,1vw,14px)", height: "clamp(9px,1vw,14px)", background: ready ? GOLD : `${CARAMEL}66`, boxShadow: ready ? `0 0 14px ${GOLD}` : "none" }}
           />
-          <span style={{ color: accent, fontSize: 34, fontWeight: 900 }}>{title}</span>
+          <span style={{ color: accent, fontSize: "clamp(18px, 2.4vw, 34px)", fontWeight: 900 }}>{title}</span>
         </span>
         <span className="flex items-center gap-3">
           {pages > 1 && (
@@ -133,7 +133,7 @@ function Column({
               ))}
             </span>
           )}
-          <span className="tabular-nums" style={{ color: `${INK}55`, fontSize: 26, fontWeight: 800 }}>
+          <span className="tabular-nums" style={{ color: `${INK}55`, fontSize: "clamp(15px, 1.8vw, 26px)", fontWeight: 800 }}>
             {rows.length}
           </span>
         </span>
@@ -224,14 +224,20 @@ function Idle({ items, now }: { items: ShowcaseItem[]; now: number }) {
           className="absolute inset-0 h-full w-full object-cover"
           // The café's product photos are shot dark on dark; straight out of the
           // bucket they read as a muddy brown wall from across the room.
-          style={{ animation: "kenBurns 8s ease-out both", filter: "brightness(1.45) contrast(1.12) saturate(1.08)" }}
+          style={{
+            animation: "kenBurns 8s ease-out both",
+            filter: "brightness(1.85) contrast(1.06) saturate(1.12)",
+            // The café's photos put the product LOW in the frame, so a centred
+            // cover crop shows empty background and cuts the drink off.
+            objectPosition: "50% 72%",
+          }}
         />
       )}
 
       {message ? (
         <>
           {/* a message must stay readable, so its photo sits further back */}
-          <div className="absolute inset-0" style={{ background: `${ESPRESSO_2}b8` }} />
+          <div className="absolute inset-0" style={{ background: `${ESPRESSO_2}a6` }} />
           <div className="absolute inset-0 flex flex-col items-center justify-center px-10 text-center" style={{ animation: "riseIn .9s .2s ease both" }}>
             <Logo size={180} />
             <div className="mt-7 font-black leading-tight" style={{ fontSize: "clamp(3rem,8vw,6rem)", color: INK, textShadow: "0 4px 30px rgba(0,0,0,.6)" }}>
@@ -244,13 +250,20 @@ function Idle({ items, now }: { items: ShowcaseItem[]; now: number }) {
         </>
       ) : (
         <>
-          {/* only the lower third is darkened, so the drink itself stays visible */}
-          <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${ESPRESSO_2}f2 0%, ${ESPRESSO_2}99 22%, transparent 46%)` }} />
-          <div className="absolute inset-x-0 bottom-0 p-12 text-center" style={{ animation: "riseIn .9s .25s ease both" }}>
-            <div style={{ color: GOLD, fontSize: "clamp(1rem,1.8vw,1.5rem)", fontWeight: 800, letterSpacing: 2, textShadow: "0 2px 14px rgba(0,0,0,.7)" }}>
+          {/* A lower-third bar instead of a full-frame scrim: the photo stays bright
+              all the way up, and the caption is legible over a white cup or a dark
+              one alike — a gradient tuned for one product fails on the next. */}
+          <div
+            className="absolute inset-x-0 bottom-0 px-10 pb-9 pt-24 text-center"
+            style={{
+              background: `linear-gradient(to top, ${ESPRESSO_2} 0%, ${ESPRESSO_2}f2 42%, ${ESPRESSO_2}c0 68%, transparent 100%)`,
+              animation: "riseIn .9s .25s ease both",
+            }}
+          >
+            <div style={{ color: GOLD, fontSize: "clamp(1rem,1.8vw,1.5rem)", fontWeight: 800, letterSpacing: 2, textShadow: "0 2px 10px rgba(0,0,0,.95), 0 0 26px rgba(0,0,0,.8)" }}>
               {slide.item.category}
             </div>
-            <div className="mt-2 font-black leading-tight" style={{ fontSize: "clamp(2.6rem,6.5vw,5rem)", color: INK, textShadow: "0 4px 26px rgba(0,0,0,.75)" }}>
+            <div className="mt-2 font-black leading-tight" style={{ fontSize: "clamp(2.6rem,6.5vw,5rem)", color: INK, textShadow: "0 3px 12px rgba(0,0,0,.95), 0 0 40px rgba(0,0,0,.75)" }}>
               {slide.item.name}
             </div>
           </div>
@@ -265,6 +278,7 @@ export function QueueDisplayClient({ initialRows, showcase }: { initialRows: Que
   const [now, setNow] = useState<number>(() => Date.now());
   const [availH, setAvailH] = useState(420);
   const [availW, setAvailW] = useState(900);
+  const [stacked, setStacked] = useState(false);
   const gaugeRef = useRef<HTMLDivElement>(null);
   const prevReady = useRef<string[]>(initialRows.filter((r) => r.prep_status === "ready").map((r) => r.id));
 
@@ -319,9 +333,12 @@ export function QueueDisplayClient({ initialRows, showcase }: { initialRows: Que
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      setAvailH(Math.max(90, Math.floor(r.height)));
-      // each column gets half the gauge minus the divider and the gap between them
-      setAvailW(Math.max(120, Math.floor((r.width - 32 - 1) / 2)));
+      // A portrait or narrow screen (a vertical signage panel, a tablet, a phone)
+      // cannot hold two columns side by side — stack them instead of squeezing.
+      const stack = r.width < 820 || r.width / Math.max(r.height, 1) < 1.15;
+      setStacked(stack);
+      setAvailH(Math.max(90, Math.floor(stack ? (r.height - 56) / 2 : r.height)));
+      setAvailW(Math.max(120, Math.floor(stack ? r.width : (r.width - 32 - 1) / 2)));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -333,6 +350,7 @@ export function QueueDisplayClient({ initialRows, showcase }: { initialRows: Que
     };
   }, []);
 
+  const logoSize = stacked ? 44 : 64;
   const { preparing, ready } = splitColumns(rows);
   const idle = rows.length === 0;
 
@@ -347,31 +365,42 @@ export function QueueDisplayClient({ initialRows, showcase }: { initialRows: Que
         @keyframes qPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.022); } }
         @keyframes slideIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes riseIn { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
-        @keyframes kenBurns { from { transform: scale(1.02) translate3d(0,0,0); } to { transform: scale(1.14) translate3d(0,-1.5%,0); } }
+        @keyframes kenBurns { from { transform: scale(1.03); } to { transform: scale(1.12); } }
         @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
       `}</style>
 
-      <header className="flex flex-none items-center justify-between px-10 pb-3 pt-6">
-        <div className="tabular-nums" style={{ color: `${INK}55`, fontSize: 26, fontWeight: 800 }}>
+      <header className="flex flex-none items-center justify-between px-6 pb-2 pt-4 sm:px-10 sm:pb-3 sm:pt-6">
+        <div className="tabular-nums" style={{ color: `${INK}55`, fontSize: "clamp(15px,1.8vw,26px)", fontWeight: 800 }}>
           {new Date(now).toLocaleTimeString("en-GB", { timeZone: "Asia/Baghdad", hour: "2-digit", minute: "2-digit", hour12: false })}
         </div>
-        <Logo size={64} />
+        <Logo size={logoSize} />
       </header>
 
       {idle ? (
         <Idle items={showcase} now={now} />
       ) : (
-        <div className="flex min-h-0 flex-1 gap-8 px-10 pb-10">
-          {/* RTL: «تحت التحضير» is read first (right); «جاهز» sits left and shouts */}
-          <Column title="تحت التحضير" rows={preparing} ready={false} availH={availH} availW={availW} now={now} />
-          <div className="w-px flex-none self-stretch" style={{ background: `${CARAMEL}33` }} />
-          <Column title="جاهز للاستلام" rows={ready} ready availH={availH} availW={availW} now={now} />
+        <div className={`flex min-h-0 flex-1 px-6 pb-6 sm:px-10 sm:pb-10 ${stacked ? "flex-col gap-5" : "gap-8"}`}>
+          {/* RTL: «تحت التحضير» is read first (right); «جاهز» sits left and shouts.
+              Stacked, «جاهز» goes on TOP for the same reason. */}
+          {stacked ? (
+            <>
+              <Column title="جاهز للاستلام" rows={ready} ready availH={availH} availW={availW} now={now} />
+              <div className="h-px flex-none" style={{ background: `${CARAMEL}33` }} />
+              <Column title="تحت التحضير" rows={preparing} ready={false} availH={availH} availW={availW} now={now} />
+            </>
+          ) : (
+            <>
+              <Column title="تحت التحضير" rows={preparing} ready={false} availH={availH} availW={availW} now={now} />
+              <div className="w-px flex-none self-stretch" style={{ background: `${CARAMEL}33` }} />
+              <Column title="جاهز للاستلام" rows={ready} ready availH={availH} availW={availW} now={now} />
+            </>
+          )}
         </div>
       )}
 
       {/* EMPTY on purpose: what is measured must not depend on what goes inside it,
           or measuring would change the very layout being measured. */}
-      <div ref={gaugeRef} aria-hidden className="pointer-events-none absolute inset-x-10" style={{ top: 122, bottom: 40, visibility: "hidden" }} />
+      <div ref={gaugeRef} aria-hidden className="pointer-events-none absolute inset-x-6 sm:inset-x-10" style={{ top: 96, bottom: 28, visibility: "hidden" }} />
     </main>
   );
 }
