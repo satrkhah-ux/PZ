@@ -8,6 +8,8 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
  *   /menu   — QR self-order menu
  *   /kiosk  — tablet self-order menu
  *   /card   — a customer's loyalty card (by unguessable serial)
+ *   /tv     — the pickup screen (guarded by its own display key, never a session:
+ *             a TV on the ceiling has no keyboard to re-login with every week)
  * Staff surfaces (/dashboard, /cashier, admin) require a session.
  *
  * Presence of a valid session cookie is the signal — token *validation* happens
@@ -15,7 +17,7 @@ import { AUTH_STORAGE_KEY, parseSessionCookie } from "@/lib/supabase/constants";
  * user whose short-lived access token expired but who still holds a refresh token.
  */
 
-const PUBLIC_PREFIXES = ["/sign-in", "/menu", "/kiosk", "/card"];
+const PUBLIC_PREFIXES = ["/sign-in", "/menu", "/kiosk", "/card", "/tv"];
 const LOGIN_PATHS = new Set(["/", "/sign-in"]);
 
 function isPublic(pathname: string): boolean {
@@ -35,6 +37,17 @@ export function proxy(request: NextRequest) {
     // whose public env is injected at runtime can NEVER bypass the gate here.
     if (process.env.NODE_ENV === "development" && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
       return NextResponse.next();
+    }
+
+    // The pickup screen is a TV nobody touches, and TV browsers suspend JS timers
+    // on an untouched page. A REAL HTTP Refresh header keeps it alive even when
+    // every JS timer is frozen (a <meta http-equiv> would be stripped by Next).
+    // 60s, not the 10s of the original design: every rebuild is a serverless
+    // invocation, and this account was already paused once for burning credits.
+    if (request.nextUrl.pathname.startsWith("/tv/")) {
+      const res = NextResponse.next();
+      res.headers.set("Refresh", "60");
+      return res;
     }
 
     const session = parseSessionCookie(request.cookies.get(AUTH_STORAGE_KEY)?.value);

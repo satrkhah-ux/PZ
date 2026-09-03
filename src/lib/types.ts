@@ -8,6 +8,9 @@
  */
 
 export type OrderChannel = "qr" | "kiosk" | "cashier";
+/** Kitchen flow for the pickup screen. */
+export type PrepStatus = "new" | "preparing" | "ready" | "handed";
+
 export type OrderStatus = "pending" | "paid" | "cancelled" | "refunded";
 export type VariantKind = "size" | "flavor";
 
@@ -145,6 +148,9 @@ export type Database = {
           subtotal: number; cost_total: number; discount: number; extra: number; extra_note: string | null;
           table_no: string | null; note: string | null;
           customer_id: string | null; cashier_id: string | null; paid_at: string | null;
+          // pickup-screen flow (columns already in the DB, previously untyped)
+          prep_status: PrepStatus | null; pickup_code: string | null;
+          expediter_id: string | null; eta_minutes: number | null; updated_at: string | null;
         };
         Insert: {
           id?: string; business_day?: string; order_seq: number; channel: OrderChannel; status?: OrderStatus;
@@ -152,7 +158,7 @@ export type Database = {
           table_no?: string | null; note?: string | null;
           customer_id?: string | null; cashier_id?: string | null; paid_at?: string | null; created_at?: string;
         };
-        Update: Partial<{ status: OrderStatus; discount: number; extra: number; extra_note: string | null; customer_id: string | null; paid_at: string | null }>;
+        Update: Partial<{ status: OrderStatus; discount: number; extra: number; extra_note: string | null; customer_id: string | null; paid_at: string | null; prep_status: PrepStatus; expediter_id: string | null; eta_minutes: number | null; updated_at: string }>;
         Relationships: [];
       };
       order_items: {
@@ -195,6 +201,17 @@ export type Database = {
       };
       variant_public: {
         Row: { id: string; item_id: string; kind: VariantKind; name_ar: string; price: number; sort: number };
+        Relationships: [];
+      };
+      /** Pickup screen. Deliberately carries NO money column — the TV is opened
+       *  by a URL key, so safety comes from what the view exposes, not the UI. */
+      queue_public: {
+        Row: {
+          id: string; order_seq: number; pickup_code: string | null;
+          prep_status: string; table_no: string | null; channel: string;
+          created_at: string; eta_minutes: number | null;
+          cashier_name: string | null; expediter_name: string | null;
+        };
         Relationships: [];
       };
       active_offers: {
