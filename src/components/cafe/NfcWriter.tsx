@@ -7,7 +7,7 @@ import { Check, Copy, Nfc } from "lucide-react";
  *  Android Chrome only; elsewhere (iOS) we just show the URL to write with an
  *  NFC-writer app like «NFC Tools». Customers tapping the tag open the URL
  *  natively — no app needed on their side. */
-export function NfcWriter({ url }: { url: string }) {
+export function NfcWriter({ url, label }: { url: string; label: string }) {
   const [state, setState] = useState<"idle" | "writing" | "done" | "copied" | "error">("idle");
   const [err, setErr] = useState<string | null>(null);
 
@@ -38,12 +38,18 @@ export function NfcWriter({ url }: { url: string }) {
       <div className="flex gap-1.5">
         <button onClick={write} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-2 py-1.5 font-semibold text-primary-foreground hover:opacity-90">
           <Nfc className="size-3.5" />
-          {state === "writing" ? "قرّب البطاقة…" : state === "done" ? "تمت الكتابة ✓" : "اكتب NFC"}
+          {state === "writing" ? `قرّب بطاقة ${label}…` : state === "done" ? "تمت الكتابة ✓" : "اكتب NFC"}
         </button>
         <button onClick={copy} aria-label="نسخ الرابط" className="flex items-center gap-1 rounded-lg border border-border px-2 py-1.5 hover:bg-secondary">
           {state === "copied" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
         </button>
       </div>
+      {state === "copied" && (
+        <p className="text-[10px] font-bold text-primary">
+          نُسخ رابط {label} — اكتبه على بطاقة هذه الطاولة وحدها. استخدام نفس الرابط لعدة بطاقات يجعل كل الطلبات تصل باسم طاولة واحدة.
+        </p>
+      )}
+      {state === "done" && <p className="text-[10px] font-bold text-primary">كُتب {label} — افحص البطاقة بالأعلى للتأكيد.</p>}
       <p dir="ltr" className="truncate text-[10px] text-muted-foreground">{url}</p>
       {err && <p className="text-[10px] text-destructive">{err}</p>}
     </div>

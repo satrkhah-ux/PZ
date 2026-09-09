@@ -2,6 +2,7 @@ import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { PrintButton } from "@/components/cafe/PrintButton";
 import { NfcWriter } from "@/components/cafe/NfcWriter";
+import { NfcScanner } from "@/components/cafe/NfcScanner";
 import { tableLabel, DEFAULT_TABLES } from "@/lib/cafe/tables";
 import { getActiveTableNames } from "@/lib/cafe/table-actions";
 
@@ -47,6 +48,8 @@ export default async function QrPage({
         <PrintButton label="طباعة الملصقات" />
       </div>
 
+      <NfcScanner />
+
       {/* main menu sticker */}
       <div className="mx-auto w-fit rounded-3xl border-2 border-primary bg-card p-6 text-center">
         <h2 className="text-2xl font-extrabold text-primary">بيزارا كافيه</h2>
@@ -65,7 +68,7 @@ export default async function QrPage({
             <img src={t.qr} alt={t.label} className="mx-auto size-40" />
             <p className="mt-1.5 text-xs text-muted-foreground">امسح للطلب من طاولتك</p>
             <div className="print:hidden">
-              <NfcWriter url={t.url} />
+              <NfcWriter url={t.url} label={t.label} />
             </div>
           </div>
         ))}
