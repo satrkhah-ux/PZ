@@ -324,22 +324,22 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
             <button
               type="button"
               onClick={() => setAdjust((a) => (a === "extra" ? null : "extra"))}
-              className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+              className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition ${
                 adjust === "extra" ? "bg-primary text-primary-foreground" : "bg-secondary/60 hover:bg-secondary"
               }`}
             >
               ➕ إضافة د.ع
-              {extraTotal > 0 && <span className="ms-1 tabular-nums">(+{formatIqdLabel(extraTotal)})</span>}
+              {extraTotal > 0 && <span className="ms-1 tabular-nums">(+{extraTotal.toLocaleString("en-US")})</span>}
             </button>
             <button
               type="button"
               onClick={() => setAdjust((a) => (a === "discount" ? null : "discount"))}
-              className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+              className={`whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition ${
                 adjust === "discount" ? "bg-primary text-primary-foreground" : "bg-secondary/60 hover:bg-secondary"
               }`}
             >
               ➖ خصم د.ع
-              {appliedDiscount > 0 && <span className="ms-1 tabular-nums">(−{formatIqdLabel(appliedDiscount)})</span>}
+              {appliedDiscount > 0 && <span className="ms-1 tabular-nums">(−{appliedDiscount.toLocaleString("en-US")})</span>}
             </button>
           </div>
 
