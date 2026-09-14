@@ -58,6 +58,8 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   // Percentage mode: null = a manual amount; a number = % of the subtotal, re-derived
   // as items change (derived, not stored, so it can never go stale).
   const [discountPct, setDiscountPct] = useState<number | null>(null);
+  // Two buttons above the totals — «إضافة د.ع» / «خصم د.ع» — open ONE fixed panel underneath.
+  const [adjust, setAdjust] = useState<"extra" | "discount" | null>(null);
   const [customer, setCustomer] = useState<Card | null>(null);
   const [serialInput, setSerialInput] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
@@ -195,6 +197,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       setCustomer(null);
       setDiscount(0);
       setDiscountPct(null);
+      setAdjust(null);
       setExtras([]);
       setSerialInput("");
       setPayMethod("cash");
@@ -314,29 +317,99 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
           {loyaltyMsg && <p className="text-xs text-muted-foreground">{loyaltyMsg}</p>}
         </div>
 
-        {/* إضافات (surcharges for add-ons) — one compact row */}
-        <div className="space-y-1.5 rounded-xl bg-secondary/60 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="me-1 text-xs font-semibold text-muted-foreground">➕ إضافة</span>
-            <PriceInput value={extraPrice} onChange={setExtraPrice} compact />
-            <button onClick={addExtra} aria-label="أضف" className="rounded-md bg-primary px-2.5 py-1 text-sm font-bold text-primary-foreground hover:opacity-90">
-              +
+        {/* إضافة / خصم — two buttons; the chosen one opens a fixed panel underneath.
+            The panel keeps one input in both discount modes so nothing shifts around. */}
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setAdjust((a) => (a === "extra" ? null : "extra"))}
+              className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+                adjust === "extra" ? "bg-primary text-primary-foreground" : "bg-secondary/60 hover:bg-secondary"
+              }`}
+            >
+              ➕ إضافة د.ع
+              {extraTotal > 0 && <span className="ms-1 tabular-nums">(+{formatIqdLabel(extraTotal)})</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdjust((a) => (a === "discount" ? null : "discount"))}
+              className={`rounded-xl px-3 py-2 text-sm font-bold transition ${
+                adjust === "discount" ? "bg-primary text-primary-foreground" : "bg-secondary/60 hover:bg-secondary"
+              }`}
+            >
+              ➖ خصم د.ع
+              {appliedDiscount > 0 && <span className="ms-1 tabular-nums">(−{formatIqdLabel(appliedDiscount)})</span>}
             </button>
           </div>
-          {extras.length > 0 && (
-            <ul className="space-y-0.5">
-              {extras.map((x, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="min-w-0 truncate">{x.name}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-primary">+{formatIqdLabel(x.price)}</span>
-                    <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} aria-label="حذف" className="rounded-md border border-border p-0.5 hover:bg-background">
-                      <Trash2 className="size-3" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+
+          {adjust === "extra" && (
+            <div className="space-y-1.5 rounded-xl bg-secondary/60 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <PriceInput value={extraPrice} onChange={setExtraPrice} compact />
+                <button onClick={addExtra} aria-label="أضف" className="rounded-md bg-primary px-2.5 py-1 text-sm font-bold text-primary-foreground hover:opacity-90">
+                  +
+                </button>
+              </div>
+              {extras.length > 0 && (
+                <ul className="space-y-0.5">
+                  {extras.map((x, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate">{x.name}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-primary">+{formatIqdLabel(x.price)}</span>
+                        <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} aria-label="حذف" className="rounded-md border border-border p-0.5 hover:bg-background">
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {adjust === "discount" && (
+            <div className="space-y-2 rounded-xl bg-secondary/60 px-3 py-2">
+              <div className="grid grid-cols-2 gap-1.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDiscountPct(null)}
+                  className={`rounded-md border px-2 py-1.5 transition ${
+                    discountPct == null ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
+                  }`}
+                >
+                  رقم (مبلغ د.ع)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountPct((p) => p ?? 10)}
+                  className={`rounded-md border px-2 py-1.5 transition ${
+                    discountPct != null ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
+                  }`}
+                >
+                  نسبة %
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  inputMode="numeric"
+                  dir="ltr"
+                  value={discountPct != null ? discountPct || "" : discount || ""}
+                  onChange={(e) => {
+                    const n = Number(e.target.value.replace(/[^\d]/g, "")) || 0;
+                    if (discountPct != null) setDiscountPct(Math.min(100, n));
+                    else setDiscount(n);
+                  }}
+                  placeholder={discountPct != null ? "النسبة" : "المبلغ"}
+                  className="w-28 rounded-md border border-input bg-background px-2 py-1.5 text-center text-base font-bold outline-none focus:ring-2 focus:ring-ring"
+                />
+                <span className="text-sm font-bold text-muted-foreground">{discountPct != null ? "%" : "د.ع"}</span>
+                <span className="ms-auto text-xs text-muted-foreground">
+                  الخصم: <b className="tabular-nums text-foreground">−{formatIqdLabel(appliedDiscount)}</b>
+                </span>
+              </div>
+            </div>
           )}
         </div>
 
@@ -352,62 +425,12 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
               <span className="text-primary">+{formatIqdLabel(extraTotal)}</span>
             </div>
           )}
-          {/* الخصم — same compact controls as the extras row, amount OR percent */}
-          <div className="space-y-1.5 rounded-xl bg-secondary/60 px-3 py-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="me-1 text-xs font-semibold text-muted-foreground">➖ خصم</span>
-              <div className="flex rounded-md border border-border p-0.5 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setDiscountPct(null)}
-                  className={`rounded px-2 py-0.5 ${discountPct == null ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
-                >
-                  د.ع
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDiscountPct((p) => p ?? 10)}
-                  className={`rounded px-2 py-0.5 ${discountPct != null ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
-                >
-                  %
-                </button>
-              </div>
-              {discountPct == null ? (
-                <PriceInput value={discount} onChange={setDiscount} compact />
-              ) : (
-                <>
-                  <div className="flex gap-1">
-                    {[5, 10, 15, 20, 25].map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => setDiscountPct(pct)}
-                        className={`rounded-md border px-2 py-1 text-xs font-bold tabular-nums transition ${
-                          discountPct === pct ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
-                        }`}
-                      >
-                        {pct}%
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    inputMode="numeric"
-                    value={discountPct || ""}
-                    onChange={(e) => setDiscountPct(Math.min(100, Math.max(0, Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0))))}
-                    placeholder="%"
-                    dir="ltr"
-                    className="w-12 rounded-md border border-input bg-background px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </>
-              )}
+          {appliedDiscount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">الخصم{discountPct != null ? ` (${discountPct}%)` : ""}</span>
+              <span className="text-destructive">−{formatIqdLabel(appliedDiscount)}</span>
             </div>
-            {appliedDiscount > 0 && (
-              <p className="text-xs text-muted-foreground">
-                الخصم المطبّق: <b className="tabular-nums text-foreground">−{formatIqdLabel(appliedDiscount)}</b>
-                {discountPct != null && <span> ({discountPct}% من {formatIqdLabel(subtotal)})</span>}
-              </p>
-            )}
-          </div>
+          )}
           <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
             <span>الإجمالي</span>
             <span>{formatIqdLabel(total)}</span>
