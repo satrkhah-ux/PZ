@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient, createSupabasePublicClient } from "@/lib/supabase/server";
 import { requireStaff } from "./auth";
 import { businessDay } from "./time";
 
@@ -158,7 +158,8 @@ export type ItemOffer = { item_id: string; name_ar: string; price: number; offer
 
 /** Today's per-item offers as { item_id: offer_price }. Public (menu reads it). */
 export async function getActiveItemOffers(): Promise<Record<string, number>> {
-  const supabase = await createSupabaseServerClient();
+  // public view, no cookies — keeps /menu static (see createSupabasePublicClient)
+  const supabase = createSupabasePublicClient();
   const { data } = await supabase.from("active_item_offers").select("item_id, offer_price");
   const map: Record<string, number> = {};
   for (const r of data ?? []) map[r.item_id] = r.offer_price;

@@ -69,3 +69,18 @@ export async function getServerUser(): Promise<User | null> {
     return null;
   }
 }
+
+/**
+ * ANON client with NO cookie access — for public, cacheable data (the menu, the
+ * day's offers). `createSupabaseServerClient` reads `cookies()`, which forces
+ * every page that touches it to render dynamically on each request; on Netlify
+ * that is one cold serverless start per visitor, and under concurrency those
+ * were taking 10-17s and getting killed at the 10s limit. Public data must not
+ * pay that price — read it with this and let the page be static/ISR.
+ */
+export function createSupabasePublicClient(): SupabaseClient<Database> {
+  const { url, anonKey } = getSupabaseEnv();
+  return createClient<Database>(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+}

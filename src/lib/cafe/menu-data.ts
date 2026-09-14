@@ -1,6 +1,6 @@
 import { isDemoServer } from "./demo";
 import { DEMO_MENU } from "./demo-menu";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient } from "@/lib/supabase/server";
 
 export type MenuVariantView = { id: string; name_ar: string; price: number };
 export type MenuItemView = {
@@ -27,7 +27,7 @@ export async function getPublicMenu(): Promise<MenuCategoryView[]> {
   if (isDemoServer()) return DEMO_MENU;
   if (_menuCache && Date.now() - _menuCache.at < MENU_TTL_MS) return _menuCache.data;
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabasePublicClient();
   const [{ data: rows }, { data: vars }] = await Promise.all([
     supabase.from("menu_public").select("*").order("category_sort").order("sort"),
     supabase.from("variant_public").select("*").order("sort"),
