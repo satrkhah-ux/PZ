@@ -55,6 +55,9 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const [cart, dispatch] = useReducer(cartReducer, {});
   const [discount, setDiscount] = useState(0);
+  // Percentage mode: null = a manual amount; a number = % of the subtotal, re-derived
+  // as items change (derived, not stored, so it can never go stale).
+  const [discountPct, setDiscountPct] = useState<number | null>(null);
   const [customer, setCustomer] = useState<Card | null>(null);
   const [serialInput, setSerialInput] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
@@ -102,7 +105,8 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const lines = Object.values(cart);
   const subtotal = useMemo(() => lines.reduce((s, l) => s + l.unitPrice * l.qty, 0), [lines]);
   const extraTotal = useMemo(() => extras.reduce((s, x) => s + x.price, 0), [extras]);
-  const total = Math.max(0, subtotal - discount + extraTotal);
+  const appliedDiscount = discountPct != null ? Math.min(subtotal, Math.round((subtotal * discountPct) / 100)) : discount;
+  const total = Math.max(0, subtotal - appliedDiscount + extraTotal);
 
   function addExtra() {
     // description is verbal at the counter — the cashier only enters the amount
@@ -140,6 +144,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     }
     // ponytail: redeem deducts points immediately, before payment — a cancelled
     // checkout needs a manual adjust-back. Acceptable v1.
+    setDiscountPct(null);
     setDiscount((d) => d + res.discount);
     setCustomer({ ...customer, points: res.balance });
     setLoyaltyMsg(`تم استبدال مكافأة — خصم ${formatIqdLabel(res.discount)}`);
@@ -168,7 +173,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       const table = orderType === "dinein" ? tableNo : null;
       const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
       const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-      const res = await cashierCheckout({ lines: payload, discount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+      const res = await cashierCheckout({ lines: payload, discount: appliedDiscount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
       if (!res.ok) {
         setErr(res.error);
         return;
@@ -179,7 +184,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
         note: orderNote.trim() || null,
         lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
         subtotal,
-        discount,
+        discount: appliedDiscount,
         extras,
         total,
         ...receiptStamp(),
@@ -189,6 +194,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       dispatch({ type: "clear" });
       setCustomer(null);
       setDiscount(0);
+      setDiscountPct(null);
       setExtras([]);
       setSerialInput("");
       setPayMethod("cash");
@@ -308,30 +314,30 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
           {loyaltyMsg && <p className="text-xs text-muted-foreground">{loyaltyMsg}</p>}
         </div>
 
-        {/* إضافات (surcharges for add-ons) */}
-        <div className="space-y-2 rounded-xl bg-secondary/60 p-3">
-          <p className="text-sm font-semibold">➕ إضافات على الطلب</p>
+        {/* إضافات (surcharges for add-ons) — one compact row */}
+        <div className="space-y-1.5 rounded-xl bg-secondary/60 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="me-1 text-xs font-semibold text-muted-foreground">➕ إضافة</span>
+            <PriceInput value={extraPrice} onChange={setExtraPrice} compact />
+            <button onClick={addExtra} aria-label="أضف" className="rounded-md bg-primary px-2.5 py-1 text-sm font-bold text-primary-foreground hover:opacity-90">
+              +
+            </button>
+          </div>
           {extras.length > 0 && (
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {extras.map((x, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                <li key={i} className="flex items-center justify-between gap-2 text-xs">
                   <span className="min-w-0 truncate">{x.name}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-primary">+{formatIqdLabel(x.price)}</span>
-                    <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} aria-label="حذف" className="rounded-md border border-border p-1 hover:bg-background">
-                      <Trash2 className="size-3.5" />
+                    <button onClick={() => setExtras((xs) => xs.filter((_, j) => j !== i))} aria-label="حذف" className="rounded-md border border-border p-0.5 hover:bg-background">
+                      <Trash2 className="size-3" />
                     </button>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <PriceInput value={extraPrice} onChange={setExtraPrice} />
-            <button onClick={addExtra} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              +
-            </button>
-          </div>
         </div>
 
         {/* totals */}
@@ -346,16 +352,61 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
               <span className="text-primary">+{formatIqdLabel(extraTotal)}</span>
             </div>
           )}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground">الخصم</span>
-            <input
-              type="number"
-              min={0}
-              value={discount || ""}
-              onChange={(e) => setDiscount(Math.max(0, Math.round(Number(e.target.value) || 0)))}
-              className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-left text-sm outline-none focus:ring-2 focus:ring-ring"
-              dir="ltr"
-            />
+          {/* الخصم — same compact controls as the extras row, amount OR percent */}
+          <div className="space-y-1.5 rounded-xl bg-secondary/60 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="me-1 text-xs font-semibold text-muted-foreground">➖ خصم</span>
+              <div className="flex rounded-md border border-border p-0.5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDiscountPct(null)}
+                  className={`rounded px-2 py-0.5 ${discountPct == null ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+                >
+                  د.ع
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiscountPct((p) => p ?? 10)}
+                  className={`rounded px-2 py-0.5 ${discountPct != null ? "bg-primary text-primary-foreground" : "hover:bg-background"}`}
+                >
+                  %
+                </button>
+              </div>
+              {discountPct == null ? (
+                <PriceInput value={discount} onChange={setDiscount} compact />
+              ) : (
+                <>
+                  <div className="flex gap-1">
+                    {[5, 10, 15, 20, 25].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDiscountPct(pct)}
+                        className={`rounded-md border px-2 py-1 text-xs font-bold tabular-nums transition ${
+                          discountPct === pct ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-background"
+                        }`}
+                      >
+                        {pct}%
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    inputMode="numeric"
+                    value={discountPct || ""}
+                    onChange={(e) => setDiscountPct(Math.min(100, Math.max(0, Math.round(Number(e.target.value.replace(/[^\d]/g, "")) || 0))))}
+                    placeholder="%"
+                    dir="ltr"
+                    className="w-12 rounded-md border border-input bg-background px-2 py-1 text-center text-sm outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </>
+              )}
+            </div>
+            {appliedDiscount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                الخصم المطبّق: <b className="tabular-nums text-foreground">−{formatIqdLabel(appliedDiscount)}</b>
+                {discountPct != null && <span> ({discountPct}% من {formatIqdLabel(subtotal)})</span>}
+              </p>
+            )}
           </div>
           <div className="flex items-center justify-between border-t border-border pt-2 text-base font-bold">
             <span>الإجمالي</span>
