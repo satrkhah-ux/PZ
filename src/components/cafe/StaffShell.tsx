@@ -111,7 +111,14 @@ export function StaffShell({
   const router = useRouter();
   const { setTheme } = useCafeUI();
   const links = NAV.filter((n) => !n.adminOnly || role === "admin");
-  const bottomTabs = links.filter((l) => l.href !== "/help").slice(0, 4); // first 4 as bottom tabs, rest in «المزيد»
+  // Owner's call: the cashier gets four fixed buttons — الكاشير · لوحة التحضير ·
+  // الطلبات · المصروفات — and everything else behind «المزيد». The scrolling strip
+  // hid half the sections off-screen. The admin keeps the dashboard in the bar.
+  const pinnedHrefs = role === "admin" ? ["/dashboard", "/cashier", "/orders", "/prep"] : ["/cashier", "/prep", "/orders", "/expenses"];
+  const pinned = pinnedHrefs.map((h) => links.find((l) => l.href === h)).filter((l): l is NavItem => !!l);
+  const rest = links.filter((l) => !pinned.includes(l));
+  // «الطلبات» is always pinned, so the only badge that can hide behind «المزيد» is the pastry alert.
+  const restAlerts = rest.some((l) => l.href === "/pastries") ? pastryAlert : 0;
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Keep the session alive on staff screens. supabase-js's own refresh loop is
@@ -251,25 +258,43 @@ export function StaffShell({
               <PizzaraMark className="size-9" />
               بيزارا كافيه
             </Link>
-            <nav className="hidden gap-1 overflow-x-auto md:flex">
-              {links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                    pathname.startsWith(l.href)
-                      ? "bg-primary text-primary-foreground"
-                      : "text-foreground/80 hover:bg-secondary"
+            <nav className="hidden items-center gap-1 md:flex">
+              {pinned.map((l) => {
+                const Icon = l.icon;
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                      pathname.startsWith(l.href) ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-secondary"
+                    }`}
+                  >
+                    <Icon className="size-4" />
+                    {l.label}
+                    {l.href === "/orders" && pendingCount > 0 && (
+                      <span className="absolute -left-1 -top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+              {rest.length > 0 && (
+                <button
+                  onClick={() => setMoreOpen(true)}
+                  className={`relative flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                    rest.some((l) => pathname.startsWith(l.href)) ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-secondary"
                   }`}
                 >
-                  {l.label}
-                  {((l.href === "/orders" && pendingCount > 0) || (l.href === "/pastries" && pastryAlert > 0)) && (
+                  <MoreHorizontal className="size-4" />
+                  المزيد
+                  {restAlerts > 0 && (
                     <span className="absolute -left-1 -top-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-                      {l.href === "/orders" ? pendingCount : pastryAlert}
+                      {restAlerts}
                     </span>
                   )}
-                </Link>
-              ))}
+                </button>
+              )}
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -319,7 +344,7 @@ export function StaffShell({
 
       {/* app-like bottom tab bar (mobile only) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur md:hidden print:hidden">
-        {bottomTabs.map((l) => {
+        {pinned.map((l) => {
           const active = pathname.startsWith(l.href);
           const Icon = l.icon;
           return (
@@ -356,17 +381,21 @@ export function StaffShell({
 
       {/* «المزيد» sheet — the full menu */}
       {moreOpen && (
-        <div className="fixed inset-0 z-40 md:hidden print:hidden" onClick={() => setMoreOpen(false)}>
+        <div className="fixed inset-0 z-40 print:hidden" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-card p-4 pb-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          {/* bottom sheet on phones; a centred card on the POS screen */}
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-card p-4 pb-8 shadow-2xl md:inset-x-auto md:bottom-auto md:left-1/2 md:top-20 md:w-[40rem] md:max-w-[92vw] md:-translate-x-1/2 md:rounded-3xl md:pb-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-3 flex items-center justify-between">
               <span className="font-bold">{name}</span>
               <button onClick={() => setMoreOpen(false)} aria-label="إغلاق" className="rounded-lg border border-border p-1.5 hover:bg-secondary">
                 <X className="size-4" />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {links.map((l) => {
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-4">
+              {rest.map((l) => {
                 const Icon = l.icon;
                 const active = pathname.startsWith(l.href);
                 return (
