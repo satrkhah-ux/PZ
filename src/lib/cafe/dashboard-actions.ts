@@ -73,10 +73,12 @@ export async function getTodaySinceReset(): Promise<DaySummary> {
 
   const { data: orders } = await svc
     .from("orders")
-    .select("subtotal, cost_total")
+    .select("subtotal, discount, extra, cost_total")
     .eq("status", "paid")
     .gte("paid_at", cutoff);
-  const sales = (orders ?? []).reduce((s, o) => s + (o.subtotal ?? 0), 0);
+  // paid amount = subtotal − discount + extra — the same formula as range_summary
+  // (the receipt already printed the discount; this card was still adding the gross)
+  const sales = (orders ?? []).reduce((s, o) => s + (o.subtotal ?? 0) - (o.discount ?? 0) + (o.extra ?? 0), 0);
   const cost = (orders ?? []).reduce((s, o) => s + (o.cost_total ?? 0), 0);
   const orders_count = (orders ?? []).length;
 
@@ -104,6 +106,10 @@ export type RecentOrder = {
   channel: string;
   status: string;
   subtotal: number;
+  discount: number;
+  extra: number;
+  /** what was actually paid: subtotal − discount + extra */
+  total: number;
   table_no: string | null;
   created_at: string;
   items: RecentOrderItem[];
@@ -115,7 +121,7 @@ export async function getRecentOrders(limit = 15): Promise<RecentOrder[]> {
   const svc = createSupabaseServiceClient();
   const { data: orders } = await svc
     .from("orders")
-    .select("id, order_seq, channel, status, subtotal, table_no, created_at")
+    .select("id, order_seq, channel, status, subtotal, discount, extra, table_no, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (!orders?.length) return [];
@@ -131,5 +137,9 @@ export async function getRecentOrders(limit = 15): Promise<RecentOrder[]> {
     arr.push({ name_ar: it.name_ar, flavor_ar: it.flavor_ar, qty: it.qty, line_total: it.line_total });
     byOrder.set(it.order_id, arr);
   }
-  return orders.map((o) => ({ ...o, items: byOrder.get(o.id) ?? [] })) as RecentOrder[];
+  return orders.map((o) => ({
+    ...o,
+    total: (o.subtotal ?? 0) - (o.discount ?? 0) + (o.extra ?? 0),
+    items: byOrder.get(o.id) ?? [],
+  })) as RecentOrder[];
 }

@@ -286,7 +286,10 @@ export function DashboardClient({
                             {STATUS_AR[o.status] ?? o.status}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5">{formatIqdLabel(o.subtotal)}</td>
+                        <td className="px-4 py-2.5">
+                          {formatIqdLabel(o.total)}
+                          {o.discount > 0 && <span className="ms-1 text-xs text-destructive">(خصم {formatIqdLabel(o.discount)})</span>}
+                        </td>
                         <td className="px-4 py-2.5 text-muted-foreground" dir="ltr">
                           {new Date(o.created_at).toLocaleString("en-GB", {
                             timeZone: "Asia/Baghdad",
@@ -311,6 +314,24 @@ export function DashboardClient({
                                   <span className="text-muted-foreground">{formatIqdLabel(it.line_total)}</span>
                                 </li>
                               ))}
+                              {o.discount > 0 && (
+                                <li className="flex justify-between text-destructive">
+                                  <span>الخصم</span>
+                                  <span>−{formatIqdLabel(o.discount)}</span>
+                                </li>
+                              )}
+                              {o.extra > 0 && (
+                                <li className="flex justify-between text-primary">
+                                  <span>إضافات</span>
+                                  <span>+{formatIqdLabel(o.extra)}</span>
+                                </li>
+                              )}
+                              {(o.discount > 0 || o.extra > 0) && (
+                                <li className="flex justify-between border-t border-border/60 pt-1 font-bold">
+                                  <span>المدفوع</span>
+                                  <span>{formatIqdLabel(o.total)}</span>
+                                </li>
+                              )}
                             </ul>
                           </td>
                         </tr>
