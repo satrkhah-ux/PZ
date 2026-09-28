@@ -149,6 +149,9 @@ export function DashboardClient({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-muted-foreground">
                 مبيعات يوم محدّد — لمطابقة الصندوق
+                <Link href="/reports" className="ms-2 font-bold text-primary hover:underline">
+                  سجل مفصّل بين تاريخين ←
+                </Link>
               </h2>
               <div className="flex items-center gap-2">
                 <button

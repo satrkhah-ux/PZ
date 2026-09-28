@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "./auth";
+import { assertDayRange, RANGE_ORDERS_LIMIT } from "./date-range";
 import { businessDay } from "./time";
 
 export type DaySummary = {
@@ -18,6 +19,9 @@ export type DaySummary = {
  *  so it goes through the service client (range_summary is service-role-only). */
 export async function getRangeSummary(from: string, to: string): Promise<DaySummary[]> {
   await requireAdmin();
+  // Guarded here rather than at each call site: since the reports screen the
+  // dates can come straight from the user.
+  assertDayRange(from, to);
   const svc = createSupabaseServiceClient();
   const { data, error } = await svc.rpc("range_summary", { p_from: from, p_to: to });
   if (error) throw new Error(error.message);
@@ -142,4 +146,58 @@ export async function getRecentOrders(limit = 15): Promise<RecentOrder[]> {
     total: (o.subtotal ?? 0) - (o.discount ?? 0) + (o.extra ?? 0),
     items: byOrder.get(o.id) ?? [],
   })) as RecentOrder[];
+}
+
+export type RangeOrder = {
+  id: string;
+  business_day: string;
+  order_seq: number;
+  channel: string;
+  status: string;
+  subtotal: number;
+  discount: number;
+  extra: number;
+  /** what was actually paid: subtotal − discount + extra */
+  total: number;
+  table_no: string | null;
+  note: string | null;
+  extra_note: string | null;
+  created_at: string;
+  items: RecentOrderItem[];
+};
+
+/** Every paid order in a date range, each with its line items — the «سجل
+ *  المبيعات» detail log.
+ *
+ *  One embedded select rather than the orders-then-`.in(ids)` pair getRecentOrders
+ *  uses: PostgREST's 1000-row cap applies to the top-level table only, so the
+ *  nested items are never the thing that overflows. Measured on live data, 500
+ *  orders with their 694 items come back in under a second — comfortably inside
+ *  the serverless limit. Admin only, and `business_day` (not `paid_at`) is the
+ *  axis so the numbers line up with range_summary. */
+export async function getRangeOrders(from: string, to: string, limit = RANGE_ORDERS_LIMIT): Promise<RangeOrder[]> {
+  await requireAdmin();
+  assertDayRange(from, to);
+  const svc = createSupabaseServiceClient();
+  const { data, error } = await svc
+    .from("orders")
+    .select(
+      "id, business_day, order_seq, channel, status, subtotal, discount, extra, table_no, note, extra_note, created_at, order_items(name_ar, flavor_ar, qty, line_total)",
+    )
+    .eq("status", "paid")
+    .gte("business_day", from)
+    .lte("business_day", to)
+    .order("business_day", { ascending: false })
+    .order("order_seq", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((o) => {
+    const row = o as typeof o & { order_items: RecentOrderItem[] | null };
+    return {
+      ...row,
+      total: (row.subtotal ?? 0) - (row.discount ?? 0) + (row.extra ?? 0),
+      items: row.order_items ?? [],
+    };
+  }) as unknown as RangeOrder[];
 }

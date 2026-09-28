@@ -9,6 +9,7 @@ import {
   BellOff,
   BellRing,
   Calculator,
+  CalendarSearch,
   ChefHat,
   ClipboardList,
   CreditCard,
@@ -80,6 +81,7 @@ function chime() {
 type NavItem = { href: string; label: string; short: string; adminOnly: boolean; icon: LucideIcon };
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "لوحة التحكم", short: "التحكم", adminOnly: true, icon: LayoutDashboard },
+  { href: "/reports", label: "سجل المبيعات", short: "السجل", adminOnly: true, icon: CalendarSearch },
   { href: "/cashier", label: "الكاشير", short: "الكاشير", adminOnly: false, icon: Calculator },
   { href: "/orders", label: "الطلبات الواردة", short: "الطلبات", adminOnly: false, icon: ClipboardList },
   { href: "/prep", label: "لوحة التحضير", short: "التحضير", adminOnly: false, icon: ChefHat },
