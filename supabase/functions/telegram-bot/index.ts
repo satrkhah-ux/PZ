@@ -42,6 +42,42 @@ function parseDate(s: string): string | null {
   return iso;
 }
 
+/** Telegram caps a message at 4096 chars. Cut on a line boundary: slicing mid-tag
+ *  leaves a half-open <b> and Telegram then rejects the WHOLE message. */
+const clamp = (s: string, n = 3900) =>
+  s.length <= n ? s : s.slice(0, s.lastIndexOf("\n", n) + 1) + "…";
+
+/** The bot's range cap is smaller than the website's: it is sized by the 4096-char
+ *  message, not by query speed. A day line is ~48 chars, so 62 days leaves room
+ *  for the header and totals. */
+const MAX_RANGE_DAYS = 62;
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400e3) + 1;
+
+/** Two dates out of one typed line. Takes the first two date-shaped tokens and
+ *  ignores whatever sits between them — space, «-», «..», «،», «من/إلى/حتى» all
+ *  work without «-» being ambiguous between a separator and part of a date.
+ *  Reversed input is swapped rather than rejected: the intent is unambiguous. */
+function parseRange(s: string): [string, string] | null {
+  const tok = s.match(/(?<!\d)(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}|\d{1,2}[/.\-]\d{1,2})(?!\d)/g);
+  if (!tok || tok.length < 2) return null;
+  const a = parseDate(tok[0]), b = parseDate(tok[1]);
+  if (!a || !b) return null;
+  return a <= b ? [a, b] : [b, a];
+}
+
+/** Preset ranges are stored as SYMBOLS (p7, pm1…), never as baked dates: a menu
+ *  message lives in the chat for weeks, and «آخر ٧ أيام» must still mean the last
+ *  seven days whenever it is tapped. */
+function presetRange(p: string): [string, string] {
+  const t = baghdadDay();
+  if (p === "7") return [baghdadDay(-6), t];
+  if (p === "30") return [baghdadDay(-29), t];
+  if (p === "m0") return [`${t.slice(0, 7)}-01`, t];
+  const prevEnd = new Date(Date.parse(`${t.slice(0, 7)}-01T00:00:00Z`) - 86400e3).toISOString().slice(0, 10);
+  return [`${prevEnd.slice(0, 7)}-01`, prevEnd];
+}
+
 async function tg(method: string, payload: Record<string, unknown>) {
   const r = await fetch(`${API}/${method}`, {
     method: "POST",
@@ -129,6 +165,7 @@ function mainMenu() {
   return [
     [{ text: "📊 اليوم", callback_data: "rpt|0" }, { text: "📅 الأسبوع", callback_data: "rpt|6" }, { text: "🗓️ الشهر", callback_data: "rpt|29" }],
     [{ text: "📆 مبيعات أمس", callback_data: "day|1" }, { text: "🔎 مبيعات بتاريخ", callback_data: "search" }],
+    [{ text: "📈 بحث بين تاريخين", callback_data: "range" }],
     [{ text: "🧾 الطلبات الآن", callback_data: "now" }, { text: "🍽️ الطاولات", callback_data: "tables" }],
     [{ text: "🔥 الأكثر والأقل مبيعاً", callback_data: "top" }, { text: "📃 مبيعات كل منتج", callback_data: "counts" }],
     [{ text: "📋 المنتجات المتاحة", callback_data: "avail" }, { text: "⚙️ إدارة المنتجات", callback_data: "pcats" }],
@@ -173,6 +210,95 @@ async function viewDaySummary(day: string) {
   ].join("\n");
 }
 
+// ── «بحث بين تاريخين»: a period summary and the full order log ──────────────
+const LOG_PAGE = 8;
+
+const kbRangePick = () => [
+  [{ text: "آخر ٧ أيام", callback_data: "rng|p7" }, { text: "آخر ٣٠ يوماً", callback_data: "rng|p30" }],
+  [{ text: "هذا الشهر", callback_data: "rng|pm0" }, { text: "الشهر الماضي", callback_data: "rng|pm1" }],
+  [{ text: "✍️ تواريخ يدوية", callback_data: "rngask" }],
+  BACK,
+];
+
+const kbRange = (from: string, to: string, refresh: string) => [
+  [{ text: "🧾 سجل الطلبات بالتفصيل", callback_data: `log|${from}|${to}|0` }],
+  [{ text: "🔄 تحديث", callback_data: refresh }, { text: "📈 فترة أخرى", callback_data: "range" }],
+  BACK,
+];
+
+function kbLog(from: string, to: string, page: number, pages: number) {
+  const nav: Row[] = [];
+  if (page > 0) nav.push({ text: "⬅️ السابق", callback_data: `log|${from}|${to}|${page - 1}` });
+  nav.push({ text: `${page + 1}/${pages}`, callback_data: `log|${from}|${to}|${page}` });
+  if (page + 1 < pages) nav.push({ text: "التالي ➡️", callback_data: `log|${from}|${to}|${page + 1}` });
+  return [nav, [{ text: "📊 ملخص الفترة", callback_data: `rng|${from}|${to}` }], BACK];
+}
+
+/** Period totals first (what he actually wants), then the day-by-day breakdown,
+ *  so any length clamp can only ever eat the least important tail. */
+async function viewRange(from: string, to: string) {
+  const n = daysBetween(from, to);
+  if (!Number.isFinite(n) || n < 1) return "⚠️ فترة غير صالحة.";
+  if (n > MAX_RANGE_DAYS) return `⚠️ الفترة ${n} يوماً — الحد ${MAX_RANGE_DAYS} يوماً. قسّمها إلى فترتين.`;
+  const rows = await summary(from, to);
+  const t = sumRows(rows);
+  const lines = [
+    `📈 <b>مبيعات من ${from} إلى ${to}</b> (${n} يوماً)`, "",
+    `🧾 الطلبات: <b>${t.c}</b>`,
+    `💰 المبيعات: <b>${fmt(t.s)} د.ع</b>`,
+    `📉 المصروفات: <b>${fmt(t.e)} د.ع</b>`,
+    `✅ الصافي: <b>${fmt(t.n)} د.ع</b>`,
+  ];
+  const active = (Array.isArray(rows) ? rows : []).filter((d: Row) => +d.orders_count > 0 || +d.expenses > 0);
+  if (active.length) {
+    lines.push("", "📅 <b>التفصيل اليومي</b>");
+    for (const d of active) lines.push(`${d.day} — 🧾 ${d.orders_count} — 💰 ${fmt(d.sales)} — ✅ ${fmt(d.net)}`);
+  } else {
+    lines.push("", "لا حركة في هذه الفترة.");
+  }
+  return clamp(lines.join("\n"));
+}
+
+/** One page of the detail log. Bounded orders query with the items embedded —
+ *  PostgREST's 1000-row cap is on the top-level table, and a page is 8 rows, so
+ *  fetching the whole range (restAll) on every tap would be pure waste.
+ *  The order count comes free from range_summary, which uses the same predicate. */
+async function viewLog(from: string, to: string, page: number) {
+  const t = sumRows(await summary(from, to));
+  const pages = Math.max(1, Math.ceil(t.c / LOG_PAGE));
+  page = Math.min(Math.max(0, page), pages - 1);
+  // unique(business_day, order_seq) makes this a total order, so paging never
+  // repeats or skips a row between taps
+  const orders: Row[] = t.c
+    ? await rest(
+        `orders?status=eq.paid&business_day=gte.${from}&business_day=lte.${to}` +
+          `&select=order_seq,business_day,channel,table_no,subtotal,discount,extra,extra_note,note,` +
+          `order_items(name_ar,flavor_ar,qty,line_total)` +
+          `&order=business_day.asc,order_seq.asc&offset=${page * LOG_PAGE}&limit=${LOG_PAGE}`,
+      )
+    : [];
+  const lines = [
+    `🧾 <b>سجل الطلبات — من ${from} إلى ${to}</b>`,
+    `صفحة ${page + 1} من ${pages} — ${t.c} طلب، ${fmt(t.s)} د.ع`,
+  ];
+  if (!orders.length) lines.push("", "لا توجد طلبات في هذه الفترة.");
+  for (const o of orders) {
+    const paid = (+o.subtotal || 0) - (+o.discount || 0) + (+o.extra || 0);
+    const where = o.table_no ? ` — طاولة ${esc(o.table_no)}` : "";
+    lines.push("", `<b>#${String(o.order_seq).padStart(3, "0")}</b> — ${o.business_day} — ${CHANNEL_AR[o.channel] ?? esc(o.channel)}${where}`);
+    for (const it of (o.order_items ?? []) as Row[]) {
+      const flav = it.flavor_ar ? ` (${esc(it.flavor_ar)})` : "";
+      lines.push(`• ${esc(it.name_ar)}${flav} ×${it.qty} — ${fmt(it.line_total)}`);
+    }
+    const bits = [`💰 <b>${fmt(paid)} د.ع</b>`];
+    if (+o.discount > 0) bits.push(`خصم ${fmt(o.discount)}`);
+    if (+o.extra > 0) bits.push(`إضافة ${fmt(o.extra)}${o.extra_note ? ` (${esc(o.extra_note)})` : ""}`);
+    lines.push(bits.join(" — "));
+    if (o.note) lines.push(`📝 ${esc(o.note)}`);
+  }
+  return { text: clamp(lines.join("\n")), page, pages };
+}
+
 async function viewNow() {
   const [pending, total] = await Promise.all([pendingOrders(), countOrdersToday()]);
   const lines = [`🧾 <b>الطلبات الآن</b>`, "", `المعلّقة (بانتظار الدفع): <b>${pending.length}</b>`];
@@ -181,7 +307,7 @@ async function viewNow() {
   }
   if (pending.length === 0) lines.push("لا يوجد طلبات معلّقة ✅");
   lines.push("", `إجمالي طلبات اليوم: <b>${total}</b>`);
-  return lines.join("\n");
+  return clamp(lines.join("\n"));
 }
 
 async function viewTables() {
@@ -212,7 +338,7 @@ async function viewTables() {
     }
   }
   lines.push("", empty.length === tableNames.length ? "كل الطاولات فارغة." : `الطاولات الفارغة: ${empty.join("، ") || "لا شيء"}`);
-  return lines.join("\n");
+  return clamp(lines.join("\n"));
 }
 
 async function aggregateSold(fromDay: string) {
@@ -231,14 +357,14 @@ async function viewTop() {
   lines.push("", `📉 <b>الأقل طلباً</b>`);
   sorted.slice(-5).reverse().forEach(([n, q]) => lines.push(`• ${esc(n)} — <b>${q}</b>`));
   lines.push("", `📦 مجموع القطع المباعة: <b>${total}</b>`);
-  return lines.join("\n");
+  return clamp(lines.join("\n"));
 }
 
 async function viewCounts() {
   const sorted = await aggregateSold(baghdadDay(-29));
   const lines = [`📃 <b>مبيعات كل منتج — آخر ٣٠ يوماً</b>`, ""];
   sorted.forEach(([n, q]) => lines.push(`${esc(n)} — <b>${q}</b>`));
-  return lines.join("\n").slice(0, 4000);
+  return clamp(lines.join("\n"));
 }
 
 async function viewAvail() {
@@ -254,7 +380,7 @@ async function viewAvail() {
     lines.push("");
   }
   lines.push(off ? `⛔ معطّل حالياً: ${off} منتج` : "كل المنتجات مفعّلة ✅");
-  return lines.join("\n").slice(0, 4000);
+  return clamp(lines.join("\n"));
 }
 
 async function viewDailyFinal() {
@@ -288,7 +414,7 @@ async function viewDailyFinal() {
   ];
   if (sold.length === 0) lines.push("لا مبيعات اليوم.");
   else sold.forEach(([n, q]) => lines.push(`• ${esc(n)} — <b>${q}</b>`));
-  return lines.join("\n").slice(0, 4000);
+  return clamp(lines.join("\n"));
 }
 
 async function kbCategories() {
@@ -334,6 +460,16 @@ async function onMessage(msg: Row) {
         return;
       }
       await say(chatId, await viewDaySummary(day), [[{ text: "🔄 تحديث", callback_data: `dayx|${day}` }], BACK]);
+      return;
+    }
+    if (state.action === "searchrange") {
+      const r = parseRange(text);
+      if (!r) {
+        await say(chatId, "فترة غير صالحة — أرسل تاريخين، مثال: <code>1/8 - 31/8</code>", [[{ text: "✍️ حاول مجدداً", callback_data: "rngask" }], BACK]);
+        return;
+      }
+      const [from, to] = r;
+      await say(chatId, await viewRange(from, to), kbRange(from, to, `rng|${from}|${to}`));
       return;
     }
     if (state.action === "price" || state.action === "cost") {
@@ -386,7 +522,7 @@ async function onCallback(cb: Row) {
   if (!authorized(chatId)) return;
   await clearState(chatId);
 
-  const [cmd, a, b] = String(cb.data).split("|");
+  const [cmd, a, b, c] = String(cb.data).split("|");
   if (cmd === "menu") return say(chatId, "☕️ <b>بيزارا كافيه — لوحة التحكم</b>\nاختر من الأزرار:", mainMenu(), mid);
   if (cmd === "rpt") return say(chatId, await viewReport(Number(a)), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
   if (cmd === "day") return say(chatId, await viewDaySummary(baghdadDay(-Number(a))), [[{ text: "🔄 تحديث", callback_data: cb.data }], BACK], mid);
@@ -394,6 +530,19 @@ async function onCallback(cb: Row) {
   if (cmd === "search") {
     await setState(chatId, { action: "searchdate" });
     return say(chatId, "🔎 أرسل التاريخ المطلوب:\nمثال: <code>2026-08-10</code> أو <code>10/08/2026</code>", [[{ text: "إلغاء", callback_data: "menu" }]], mid);
+  }
+  if (cmd === "range") return say(chatId, "📈 <b>بحث بين تاريخين</b>\nاختر فترة جاهزة أو اكتب التاريخين:", kbRangePick(), mid);
+  if (cmd === "rng") {
+    const [from, to] = a.startsWith("p") ? presetRange(a.slice(1)) : [a, b];
+    return say(chatId, await viewRange(from, to), kbRange(from, to, cb.data), mid);
+  }
+  if (cmd === "rngask") {
+    await setState(chatId, { action: "searchrange" });
+    return say(chatId, "✍️ أرسل تاريخين:\nمثال: <code>1/8 - 31/8</code>\nأو: <code>2026-08-01 2026-08-31</code>", [[{ text: "إلغاء", callback_data: "range" }]], mid);
+  }
+  if (cmd === "log") {
+    const r = await viewLog(a, b, Number(c) || 0);
+    return say(chatId, r.text, kbLog(a, b, r.page, r.pages), mid);
   }
   if (cmd === "now") return say(chatId, await viewNow(), [[{ text: "🔄 تحديث", callback_data: "now" }], BACK], mid);
   if (cmd === "tables") return say(chatId, await viewTables(), [[{ text: "🔄 تحديث", callback_data: "tables" }], BACK], mid);
