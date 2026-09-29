@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, ChefHat, HandPlatter, Loader2 } from "lucide-react";
+import { Check, CheckCheck, ChefHat, HandPlatter, Loader2 } from "lucide-react";
 import { listPrepBoard, setPrepStatus, type PrepOrder } from "@/lib/cafe/queue-actions";
 import { usePoll } from "@/lib/cafe/use-poll";
 
@@ -64,6 +64,40 @@ export function PrepBoardClient() {
   const waiting = orders.filter((o) => o.prep !== "ready");
   const ready = orders.filter((o) => o.prep === "ready");
 
+  /** «جهّز الكل» / «سلّم الكل» — one tap at the end of a rush instead of a dozen.
+   *  Confirmed first: both change the hall screen for every waiting customer at
+   *  once, and «سلّم» clears the board with no undo. */
+  async function moveAll(targets: PrepOrder[], prep: "ready" | "handed", question: string) {
+    if (busy || !targets.length) return;
+    if (!window.confirm(question)) return;
+    const ids = targets.map((o) => o.id);
+    setBusy("__all__");
+    setErr(null);
+    setOrders((prev) =>
+      prep === "handed"
+        ? prev.filter((o) => !ids.includes(o.id))
+        : prev.map((o) => (ids.includes(o.id) ? { ...o, prep } : o)),
+    );
+    try {
+      const res = await setPrepStatus(ids, prep);
+      if (!res.ok) setErr(res.error);
+    } catch {
+      setErr("تعذّر تحديث الطلبات — أعد المحاولة.");
+    } finally {
+      setBusy(null);
+      await refresh();
+    }
+  }
+
+  const readyAll = () =>
+    moveAll(waiting, "ready", `تجهيز ${waiting.length} طلباً؟ ستظهر كلها «جاهزة» على شاشة الاستلام.`);
+
+  const handAll = () => {
+    const notReady = orders.length - ready.length;
+    const warn = notReady > 0 ? `\n\nتنبيه: ${notReady} منها لم تُعلَّم جاهزة بعد.` : "";
+    moveAll(orders, "handed", `تسليم ${orders.length} طلباً وإخلاء اللوحة؟${warn}`);
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -73,9 +107,32 @@ export function PrepBoardClient() {
             ما تضغطه هنا يظهر فوراً على شاشة الاستلام في الصالة.
           </p>
         </div>
-        <span className="rounded-full bg-secondary px-4 py-2 text-sm font-bold">
-          {waiting.length} تحت التحضير · {ready.length} جاهز
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {waiting.length > 0 && (
+            <button
+              onClick={readyAll}
+              disabled={busy !== null}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              style={{ background: "#2ecc71" }}
+            >
+              {busy === "__all__" ? <Loader2 className="size-4 animate-spin" /> : <CheckCheck className="size-4" />}
+              تجهيز الكل ({waiting.length})
+            </button>
+          )}
+          {orders.length > 0 && (
+            <button
+              onClick={handAll}
+              disabled={busy !== null}
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-60"
+            >
+              {busy === "__all__" ? <Loader2 className="size-4 animate-spin" /> : <HandPlatter className="size-4" />}
+              تسليم الكل ({orders.length})
+            </button>
+          )}
+          <span className="rounded-full bg-secondary px-4 py-2 text-sm font-bold">
+            {waiting.length} تحت التحضير · {ready.length} جاهز
+          </span>
+        </div>
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}

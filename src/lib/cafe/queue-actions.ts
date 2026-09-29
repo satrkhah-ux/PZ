@@ -101,17 +101,24 @@ export async function listPrepBoard(): Promise<PrepOrder[]> {
   }));
 }
 
-/** Move one order along the prep flow. Staff only. */
+/** Move one order — or a whole batch — along the prep flow. Staff only.
+ *
+ *  Takes an array as well as a single id so «جهّز الكل» / «سلّم الكل» is ONE
+ *  update instead of one round-trip per order: at the end of a rush the counter
+ *  taps it with a dozen orders open and every one of those requests would be a
+ *  separate serverless invocation. */
 export async function setPrepStatus(
-  orderId: string,
+  orderId: string | string[],
   prep: "preparing" | "ready" | "handed",
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireStaff();
+  const ids = (Array.isArray(orderId) ? orderId : [orderId]).filter(Boolean);
+  if (!ids.length) return { ok: true };
   const supabase = createSupabaseServiceClient();
   const { error } = await supabase
     .from("orders")
     .update({ prep_status: prep, updated_at: new Date().toISOString() })
-    .eq("id", orderId);
+    .in("id", ids);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
