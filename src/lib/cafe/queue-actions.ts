@@ -123,6 +123,60 @@ export async function setPrepStatus(
   return { ok: true };
 }
 
+export type PrepDaySummary = {
+  /** today's orders, cancelled ones excluded */
+  total: number;
+  handed: number;
+  /** still on the board: new + preparing + ready */
+  open: number;
+  ready: number;
+  /** total units made today (item quantities, not order count) */
+  units: number;
+  /** what the station actually made most of today */
+  topItems: { name: string; qty: number }[];
+};
+
+/** Today's tally for the prep screen. The board itself only shows OPEN orders,
+ *  so once an order is handed it vanishes and the station loses all sense of how
+ *  much it has made today — this is that missing number.
+ *
+ *  Counts and items only, no money: this is the kitchen screen. A busy day is
+ *  ~37 orders / ~85 units / ~17 kinds, so one embedded select is plenty. */
+export async function getPrepDaySummary(): Promise<PrepDaySummary> {
+  await requireStaff();
+  const supabase = createSupabaseServiceClient();
+  const { data } = await supabase
+    .from("orders")
+    .select("prep_status, order_items(name_ar, qty)")
+    .eq("business_day", businessDay())
+    .neq("status", "cancelled");
+
+  // `Database` is hand-written and doesn't declare the orders→order_items
+  // relation, so the embed has no generated type — cast it, as getRangeOrders does.
+  const rows = (data ?? []) as unknown as {
+    prep_status: string | null;
+    order_items: { name_ar: string; qty: number }[] | null;
+  }[];
+  const byItem = new Map<string, number>();
+  let units = 0;
+  let handed = 0;
+  let ready = 0;
+  for (const o of rows) {
+    if (o.prep_status === "handed") handed++;
+    else if (o.prep_status === "ready") ready++;
+    for (const it of o.order_items ?? []) {
+      units += it.qty;
+      byItem.set(it.name_ar, (byItem.get(it.name_ar) ?? 0) + it.qty);
+    }
+  }
+  const topItems = [...byItem.entries()]
+    .map(([name, qty]) => ({ name, qty }))
+    .sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name, "ar"))
+    .slice(0, 6);
+
+  return { total: rows.length, handed, open: rows.length - handed, ready, units, topItems };
+}
+
 /* ————— idle showcase: the cafe's own products ————— */
 
 /** Owner: the hall screen must NOT show prices. */

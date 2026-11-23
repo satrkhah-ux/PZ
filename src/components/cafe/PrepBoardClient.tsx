@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, CheckCheck, ChefHat, HandPlatter, Loader2 } from "lucide-react";
-import { listPrepBoard, setPrepStatus, type PrepOrder } from "@/lib/cafe/queue-actions";
+import { getPrepDaySummary, listPrepBoard, setPrepStatus, type PrepDaySummary, type PrepOrder } from "@/lib/cafe/queue-actions";
 import { usePoll } from "@/lib/cafe/use-poll";
 
 const AGE_WARN_MIN = 8;
+
+function Tally({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  return (
+    <span className="rounded-xl bg-secondary px-3 py-1.5 text-sm">
+      {label} <b className="tabular-nums" style={tone ? { color: tone } : undefined}>{value}</b>
+    </span>
+  );
+}
 
 function ageMinutes(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
@@ -17,13 +25,17 @@ function ageMinutes(iso: string): number {
  */
 export function PrepBoardClient() {
   const [orders, setOrders] = useState<PrepOrder[]>([]);
+  const [day, setDay] = useState<PrepDaySummary | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      setOrders(await listPrepBoard());
+      // one poll for both: the board shows only open orders, the tally covers the whole day
+      const [board, summary] = await Promise.all([listPrepBoard(), getPrepDaySummary()]);
+      setOrders(board);
+      setDay(summary);
       setErr(null);
     } catch {
       setErr("تعذّر تحديث اللوحة — تحقّق من الاتصال.");
@@ -134,6 +146,31 @@ export function PrepBoardClient() {
           </span>
         </div>
       </div>
+
+      {/* ملخص اليوم — the board hides handed orders, so without this the station
+          has no idea how much it has made today. Counts only, no money. */}
+      {day && day.total > 0 && (
+        <section className="space-y-2 rounded-2xl border bg-card p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="me-1 text-sm font-bold text-muted-foreground">ملخص اليوم</h2>
+            <Tally label="طلبات اليوم" value={day.total} />
+            <Tally label="أصناف محضّرة" value={day.units} />
+            <Tally label="جاهزة" value={day.ready} tone="#2ecc71" />
+            <Tally label="سُلّمت" value={day.handed} />
+            <Tally label="على اللوحة" value={day.open} tone={day.open > 0 ? "#e08a3c" : undefined} />
+          </div>
+          {day.topItems.length > 0 && (
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-semibold">الأكثر تحضيراً:</span>
+              {day.topItems.map((it) => (
+                <span key={it.name}>
+                  {it.name} <b className="tabular-nums text-foreground">×{it.qty}</b>
+                </span>
+              ))}
+            </p>
+          )}
+        </section>
+      )}
 
       {err && <p className="text-sm text-destructive">{err}</p>}
 
