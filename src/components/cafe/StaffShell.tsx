@@ -20,6 +20,7 @@ import {
   Moon,
   MoreHorizontal,
   QrCode,
+  RefreshCw,
   Sun,
   HandCoins,
   UtensilsCrossed,
@@ -37,6 +38,9 @@ import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
 import { savePushSubscription, removePushSubscription } from "@/lib/cafe/push-actions";
 import { PizzaraMark } from "./Logo";
+
+/** The build this tab was loaded from, baked in at build time (next.config). */
+const MY_BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -154,14 +158,17 @@ export function StaffShell({
   // new-order alert on EVERY staff screen: poll pending self-orders, badge the
   // cashier nav item, and chime + toast when a fresh table order lands.
   const [pendingCount, setPendingCount] = useState(0);
+  const [updateReady, setUpdateReady] = useState(false);
   const [toast, setToast] = useState<{ code: string; table: string | null } | null>(null);
   const knownIds = useRef<Set<string> | null>(null);
   useEffect(() => {
     let stopped = false;
     async function tick() {
       try {
-        const orders = await listPendingOrders();
+        const { orders, build } = await listPendingOrders();
         if (stopped) return;
+        // the server answered from a newer deploy than this tab was loaded from
+        if (build !== "dev" && build !== MY_BUILD) setUpdateReady(true);
         setPendingCount(orders.length);
         if (knownIds.current) {
           const fresh = orders.find((o) => !knownIds.current!.has(o.id));
@@ -336,6 +343,19 @@ export function StaffShell({
                 {pushState === "on" ? <Bell className="size-4" /> : <BellOff className="size-4" />}
               </button>
             )}
+            {updateReady && (
+              <button
+                onClick={() => window.location.reload()}
+                aria-label="يتوفر تحديث — اضغط للتحديث"
+                title={`يتوفر تحديث — اضغط للتحديث (النسخة الحالية: ${MY_BUILD})`}
+                className="flex animate-pulse items-center gap-1.5 rounded-lg bg-primary p-2 text-xs font-bold text-primary-foreground hover:opacity-90 xl:px-3"
+              >
+                <RefreshCw className="size-4" />
+                {/* label only where there is room — the POS runs at 1024px and the
+                    «المزيد» sheet carries the spelled-out button anyway */}
+                <span className="hidden xl:inline">يتوفر تحديث</span>
+              </button>
+            )}
             <button onClick={signOut} aria-label="تسجيل الخروج" className="rounded-lg border border-border p-2 hover:bg-secondary">
               <LogOut className="size-4" />
             </button>
@@ -427,6 +447,17 @@ export function StaffShell({
                 تسجيل الخروج
               </button>
             </div>
+            {/* Also here, not only in the header: on a phone the header cluster is
+                tight, and the build id makes «أي نسخة عندك؟» answerable. */}
+            <button
+              onClick={() => window.location.reload()}
+              className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition ${
+                updateReady ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              <RefreshCw className="size-4" />
+              {updateReady ? "يتوفر تحديث — اضغط للتحديث" : `تحديث الصفحة · النسخة ${MY_BUILD}`}
+            </button>
           </div>
         </div>
       )}

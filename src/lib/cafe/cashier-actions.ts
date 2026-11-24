@@ -24,7 +24,13 @@ export type PendingOrder = {
 };
 
 /** Self-orders (qr/kiosk) awaiting the counter, oldest first. */
-export async function listPendingOrders(): Promise<PendingOrder[]> {
+/** Pending self-orders, plus which build answered.
+ *
+ *  The build id rides along deliberately: every staff screen already polls this
+ *  every 25s, so the update check costs no extra request. A separate endpoint
+ *  for it would add an invocation per screen per tick — the exact idle burn that
+ *  once exhausted the Netlify credits and paused the whole site. */
+export async function listPendingOrders(): Promise<{ orders: PendingOrder[]; build: string }> {
   await requireStaff();
   const supabase = await createSupabaseServerClient();
   const { data: orders } = await supabase
@@ -32,7 +38,7 @@ export async function listPendingOrders(): Promise<PendingOrder[]> {
     .select("id, order_seq, channel, subtotal, table_no, note, created_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true });
-  if (!orders?.length) return [];
+  if (!orders?.length) return { orders: [], build: process.env.NEXT_PUBLIC_BUILD_ID ?? "dev" };
 
   const ids = orders.map((o) => o.id);
   const { data: items } = await supabase
@@ -46,16 +52,19 @@ export async function listPendingOrders(): Promise<PendingOrder[]> {
     arr.push({ name_ar: it.name_ar, flavor_ar: it.flavor_ar, qty: it.qty, unit_price: it.unit_price, line_total: it.line_total });
     byOrder.set(it.order_id, arr);
   }
-  return orders.map((o) => ({
-    id: o.id,
-    order_seq: o.order_seq,
-    channel: o.channel,
-    subtotal: o.subtotal,
-    table_no: o.table_no,
-    note: o.note,
-    created_at: o.created_at,
-    items: byOrder.get(o.id) ?? [],
-  }));
+  return {
+    orders: orders.map((o) => ({
+      id: o.id,
+      order_seq: o.order_seq,
+      channel: o.channel,
+      subtotal: o.subtotal,
+      table_no: o.table_no,
+      note: o.note,
+      created_at: o.created_at,
+      items: byOrder.get(o.id) ?? [],
+    })),
+    build: process.env.NEXT_PUBLIC_BUILD_ID ?? "dev",
+  };
 }
 
 async function payOrder(

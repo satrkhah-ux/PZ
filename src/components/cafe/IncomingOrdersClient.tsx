@@ -82,7 +82,7 @@ export function IncomingOrdersClient() {
   // ponytail: 5s poll — swap to Supabase realtime if volume grows.
   const refreshPending = useCallback(async () => {
     try {
-      const orders = await listPendingOrders();
+      const { orders } = await listPendingOrders();
       setPending(orders);
       if (seenIds.current && autoPrintRef.current) {
         const fresh = orders.filter((o) => !seenIds.current!.has(o.id));
