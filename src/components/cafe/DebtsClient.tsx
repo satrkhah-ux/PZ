@@ -108,14 +108,15 @@ export function DebtsClient({ debtors, outstanding }: { debtors: Debtor[]; outst
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="ملاحظة (اختياري) — مثلاً: طلب اليوم، تسديد جزئي…"
+          required
+          placeholder="الملاحظة (إلزامية) — مثلاً: طلب اليوم، تسديد جزئي…"
           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
         {msg && <p className="text-sm text-destructive">{msg}</p>}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => submit("debit")}
-            disabled={busy}
+            disabled={busy || !note.trim()}
             className="flex items-center justify-center gap-1.5 rounded-xl bg-destructive px-4 py-3 font-bold text-destructive-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             <HandCoins className="size-4" />
@@ -123,7 +124,7 @@ export function DebtsClient({ debtors, outstanding }: { debtors: Debtor[]; outst
           </button>
           <button
             onClick={() => submit("credit")}
-            disabled={busy}
+            disabled={busy || !note.trim()}
             className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white transition hover:opacity-90 disabled:opacity-50"
           >
             💵 تسديد دفعة

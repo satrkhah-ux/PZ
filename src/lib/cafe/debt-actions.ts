@@ -25,14 +25,18 @@ export async function addDebtEntry(input: {
   await requireStaff();
   const name = input.customer_name.trim();
   const amount = Math.max(0, Math.round(input.amount || 0));
+  const note = input.note?.trim() || "";
   if (!name) return { ok: false as const, error: "أدخل اسم العميل." };
   if (amount <= 0) return { ok: false as const, error: "أدخل المبلغ." };
+  // Required, not optional: months later a bare number tells nobody what the
+  // money was for, and this ledger is the only record of it.
+  if (!note) return { ok: false as const, error: "اكتب الملاحظة — سبب الدَّين أو التسديد." };
   const svc = createSupabaseServiceClient();
   const { error } = await svc.from("debt_entries").insert({
     customer_name: name,
     kind: input.kind,
     amount,
-    note: input.note?.trim() || null,
+    note,
     phone: input.phone?.trim() || null,
   });
   if (error) return { ok: false as const, error: error.message };
