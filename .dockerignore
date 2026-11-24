@@ -1,0 +1,11 @@
+# Never let a secret or a stale build reach the image.
+.env
+.env.*
+node_modules
+.next
+.git
+backups
+docs
+menu
+*.log
+probe-tmp.mjs
