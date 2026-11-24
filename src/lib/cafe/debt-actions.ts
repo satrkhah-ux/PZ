@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import { requireStaff } from "./auth";
+import { requireAdmin, requireStaff } from "./auth";
 
 export type Debtor = {
   customer_name: string;
@@ -67,4 +67,21 @@ export async function getTotalOutstanding(): Promise<number> {
   const svc = createSupabaseServiceClient();
   const { data } = await svc.from("debtor_balances").select("balance");
   return (data ?? []).reduce((s, d) => s + Math.max(0, d.balance || 0), 0);
+}
+
+/** Remove one wrong movement from the ledger. Admin only.
+ *
+ *  Until now nothing in the app could undo a debt entry, so a mistyped amount
+ *  was permanent: a payment of 5,000,000 — typed as «5000» into a field that
+ *  counts thousands — sat on one customer's account for seven weeks and drove
+ *  his balance so far negative that he vanished from the list entirely. */
+export async function deleteDebtEntry(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+  if (!id) return { ok: false, error: "قيد غير محدّد." };
+  const svc = createSupabaseServiceClient();
+  const { error } = await svc.from("debt_entries").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/debts");
+  revalidatePath("/dashboard");
+  return { ok: true };
 }

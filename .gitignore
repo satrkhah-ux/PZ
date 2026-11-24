@@ -22,3 +22,8 @@ Thumbs.db
 
 # designer drop zone (raw product images — uploaded to Supabase, not committed)
 /menu/
+
+# Customer data never goes near a public repo (names + what each person owes).
+backups/debt*
+backups/*customer*
+backups/*loyalty*
