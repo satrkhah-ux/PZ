@@ -149,7 +149,7 @@ export function PrepBoardClient() {
 
       {/* ملخص اليوم — the board hides handed orders, so without this the station
           has no idea how much it has made today. Counts only, no money. */}
-      {day && day.total > 0 && (
+      {day && (
         <section className="space-y-2 rounded-2xl border bg-card p-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="me-1 text-sm font-bold text-muted-foreground">ملخص اليوم</h2>
@@ -159,7 +159,7 @@ export function PrepBoardClient() {
             <Tally label="سُلّمت" value={day.handed} />
             <Tally label="على اللوحة" value={day.open} tone={day.open > 0 ? "#e08a3c" : undefined} />
           </div>
-          {day.topItems.length > 0 && (
+          {day.topItems.length > 0 ? (
             <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span className="font-semibold">الأكثر تحضيراً:</span>
               {day.topItems.map((it) => (
@@ -168,6 +168,10 @@ export function PrepBoardClient() {
                 </span>
               ))}
             </p>
+          ) : (
+            // Shown rather than hidden: a blank bar on a quiet morning is
+            // indistinguishable from the feature not being there at all.
+            <p className="text-xs text-muted-foreground">لم يُسجَّل أي طلب اليوم بعد.</p>
           )}
         </section>
       )}
