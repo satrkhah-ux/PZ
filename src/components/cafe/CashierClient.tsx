@@ -4,7 +4,16 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { Check, Minus, Plus, Printer, QrCode, Trash2 } from "lucide-react";
 import type { MenuCategoryView, MenuItemView } from "@/lib/cafe/menu-data";
 import { formatIqdLabel } from "@/lib/cafe/money";
-import { cashierCheckout } from "@/lib/cafe/cashier-actions";
+import { cashierCheckout, syncOfflineSale } from "@/lib/cafe/cashier-actions";
+import {
+  dropSale,
+  newUid,
+  nextLocalNo,
+  noteFailure,
+  pendingSales,
+  queueSale,
+  type OfflineSale,
+} from "@/lib/cafe/offline-queue";
 import { findCard, redeemReward, type Card } from "@/lib/cafe/loyalty-actions";
 import { QrScanner } from "./QrScanner";
 import { Receipt, type ReceiptData } from "./Receipt";
@@ -68,6 +77,10 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const [err, setErr] = useState<string | null>(null);
   const [sessionDead, setSessionDead] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  // sales taken while the line was down, still waiting to be sent
+  const [queued, setQueued] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [lostSale, setLostSale] = useState(false);
   const [success, setSuccess] = useState<{ orderNumber: string; awarded: number } | null>(null);
   // cash opens the drawer; Qi-card payments happen on the Qi device — no drawer.
   const [payMethod, setPayMethod] = useState<"cash" | "card">("cash");
@@ -83,6 +96,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
   const drawerKickRef = useRef(false);
   const kickBusyRef = useRef(false);
   const checkoutBusyRef = useRef(false);
+  const flushingRef = useRef(false);
   useEffect(() => {
     drawerKickRef.current = localStorage.getItem("pz-drawer") === "1";
   }, []);
@@ -152,6 +166,65 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     setLoyaltyMsg(`تم استبدال مكافأة — خصم ${formatIqdLabel(res.discount)}`);
   }
 
+  /** Send everything held locally, oldest first, one at a time.
+   *
+   *  A sale leaves the queue ONLY on a confirmed ok. Anything else — a timeout,
+   *  a 500, the line dropping again — leaves it in place to be retried, because
+   *  the server refuses a uid it has already recorded, so a resend cannot
+   *  double-charge but a premature drop would lose the money for good. */
+  const flushQueue = useCallback(async () => {
+    if (flushingRef.current) return;
+    const batch = pendingSales();
+    if (!batch.length) {
+      setQueued(0);
+      return;
+    }
+    flushingRef.current = true;
+    setSyncing(true);
+    try {
+      for (const sale of batch) {
+        if (typeof navigator !== "undefined" && navigator.onLine === false) break;
+        try {
+          const res = await syncOfflineSale({
+            uid: sale.uid,
+            lines: sale.lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty })),
+            discount: sale.discount,
+            extra: sale.extra,
+            extraNote: sale.extraNote,
+            table: sale.table,
+            note: sale.note,
+          });
+          if (res.ok) dropSale(sale.uid);
+          else noteFailure(sale.uid, res.error);
+        } catch (e) {
+          noteFailure(sale.uid, (e as Error).message);
+          break; // still offline — stop hammering, the next trigger retries
+        }
+        setQueued(pendingSales().length);
+      }
+    } finally {
+      flushingRef.current = false;
+      setSyncing(false);
+      setQueued(pendingSales().length);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Deferred by a tick: flushQueue sets state before its first await, and
+    // doing that straight from an effect body cascades renders.
+    const kick = () => void flushQueue();
+    const first = window.setTimeout(kick, 0);
+    window.addEventListener("online", kick);
+    const t = window.setInterval(() => {
+      if (pendingSales().length) kick();
+    }, 60_000);
+    return () => {
+      window.clearTimeout(first);
+      window.removeEventListener("online", kick);
+      window.clearInterval(t);
+    };
+  }, [flushQueue]);
+
   async function checkout() {
     // checkoutBusyRef is synchronous — `busy` state updates a tick later, so a
     // rapid double-tap would otherwise submit twice (double order + double drawer).
@@ -175,7 +248,63 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       const table = orderType === "dinein" ? tableNo : null;
       const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
       const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-      const res = await cashierCheckout({ lines: payload, discount: appliedDiscount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+      // The line is already known to be down — do not make the cashier wait for
+      // a timeout on every sale during an outage.
+      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+      let res: Awaited<ReturnType<typeof cashierCheckout>> | null = null;
+      if (!offline) {
+        try {
+          res = await cashierCheckout({ lines: payload, discount: appliedDiscount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+        } catch {
+          res = null; // the request never completed — fall through and hold it
+        }
+      }
+
+      if (!res) {
+        // Hold the sale, print it, serve the customer. The receipt carries «م-N»
+        // so staff can see at a glance which tickets are not yet in the system.
+        const uid = newUid();
+        const localNo = nextLocalNo();
+        const stored = queueSale({
+          uid,
+          localNo,
+          at: Date.now(),
+          lines: lines.map((l) => ({ itemId: l.itemId, variantId: l.variantId, flavor: l.flavor, qty: l.qty })),
+          discount: appliedDiscount,
+          extra: extraTotal,
+          extraNote,
+          table,
+          note: orderNote.trim() || null,
+          total,
+          tries: 0,
+          lastError: null,
+        } satisfies OfflineSale);
+        setLostSale(!stored);
+        setQueued(pendingSales().length);
+        setReceipt({
+          orderNumber: `م-${localNo}`,
+          table,
+          note: orderNote.trim() || null,
+          lines: lines.map((l) => ({ name: l.name, flavor: l.flavor, qty: l.qty, unitPrice: l.unitPrice })),
+          subtotal,
+          discount: appliedDiscount,
+          extras,
+          total,
+          ...receiptStamp(),
+        });
+        if (payMethod === "cash") kickDrawer();
+        setSuccess({ orderNumber: `م-${localNo}`, awarded: 0 });
+        dispatch({ type: "clear" });
+        setCustomer(null);
+        setDiscount(0);
+        setDiscountPct(null);
+        setAdjust(null);
+        setExtras([]);
+        setExtraPrice(0);
+        setOrderNote("");
+        return;
+      }
+
       if (!res.ok) {
         setErr(res.error);
         return;
@@ -226,6 +355,22 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
     // width blows the grid past narrow POS screens (1024px) → horizontal cut.
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <FridayPrayerNotice />
+      {/* The till keeps selling with the line down; this is the only thing that
+          tells the cashier a ticket is not in the system yet. Spans both
+          columns so it cannot be missed. */}
+      {(lostSale || queued > 0) && (
+        <div
+          className={`lg:col-span-2 rounded-xl px-4 py-2.5 text-sm font-bold ${
+            lostSale ? "bg-destructive text-destructive-foreground" : "bg-secondary text-foreground"
+          }`}
+        >
+          {lostSale
+            ? "⚠️ تعذّر حفظ آخر طلب على الجهاز — سجّله على ورقة ولا تغلق الشاشة."
+            : syncing
+              ? `⏳ جارٍ رفع ${queued} طلباً محفوظاً…`
+              : `📴 بلا إنترنت — ${queued} طلباً محفوظاً على الجهاز، سترتفع تلقائياً عند عودة الاتصال.`}
+        </div>
+      )}
       {/* items */}
       <section className="min-w-0 space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-1">

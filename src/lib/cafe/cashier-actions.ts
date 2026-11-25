@@ -152,3 +152,57 @@ export async function cancelOrder(orderId: string) {
   revalidatePath("/cashier");
   return { ok: true as const };
 }
+
+/** Send one sale that was taken while the cafe had no internet.
+ *
+ *  Safe to call repeatedly with the same `uid`: place_order_idem records the uid
+ *  with the order in a single transaction, so a reply lost on the way back can
+ *  never turn into a second sale. The till keeps the sale until THIS returns ok,
+ *  because a lost sale is worse than a resend. */
+export async function syncOfflineSale(sale: {
+  uid: string;
+  lines: OrderLineInput[];
+  discount?: number;
+  extra?: number;
+  extraNote?: string | null;
+  table?: string | null;
+  note?: string | null;
+}): Promise<{ ok: true; orderNumber: string; already: boolean } | { ok: false; error: string }> {
+  await requireStaff();
+  if (!sale.uid) return { ok: false, error: "بصمة الطلب مفقودة." };
+  if (!sale.lines?.length) return { ok: false, error: "طلب بلا أصناف." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("place_order_idem", {
+    p_client_uid: sale.uid,
+    p_channel: "cashier",
+    p_lines: sale.lines as unknown as Json,
+    p_customer: null,
+    p_table: sale.table?.trim() || null,
+    p_note: sale.note?.trim() || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  const row = data?.[0];
+  if (!row) return { ok: false, error: "تعذّر تسجيل الطلب." };
+
+  // Which day the order actually belongs to — a sale synced after midnight still
+  // belongs to the shift that rang it, and its code is derived from that day.
+  const { data: ord } = await supabase
+    .from("orders")
+    .select("business_day, status")
+    .eq("id", row.order_id)
+    .maybeSingle();
+  const day = ord?.business_day ?? businessDay();
+  const code = orderCode(row.order_seq, day);
+
+  // `already` means an earlier attempt created it. It may still be unpaid if
+  // that attempt died between the two steps, so settle it rather than assume.
+  if (row.already && ord?.status !== "pending") return { ok: true, orderNumber: code, already: true };
+
+  const paid = await payOrder(supabase, row.order_id, sale.discount ?? 0, null, sale.extra ?? 0, sale.extraNote ?? null);
+  if (!paid.ok) return paid;
+
+  revalidatePath("/cashier");
+  revalidatePath("/dashboard");
+  return { ok: true, orderNumber: code, already: !!row.already };
+}
