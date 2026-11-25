@@ -180,6 +180,9 @@ export async function syncOfflineSale(sale: {
   note?: string | null;
   /** what the paper receipt actually said — the customer already paid this */
   printedTotal?: number;
+  /** ms epoch when the till rang it, so an outage crossing midnight still books
+   *  the sale on the day it was sold */
+  rangAt?: number;
 }): Promise<{ ok: true; orderNumber: string; already: boolean } | { ok: false; error: string }> {
   await requireStaff();
   if (!sale.uid) return { ok: false, error: "بصمة الطلب مفقودة." };
@@ -193,6 +196,7 @@ export async function syncOfflineSale(sale: {
     p_customer: null,
     p_table: sale.table?.trim() || null,
     p_note: sale.note?.trim() || null,
+    p_rang_at: sale.rangAt ? new Date(sale.rangAt).toISOString() : null,
   });
   if (error) return { ok: false, error: error.message };
   const row = data?.[0];

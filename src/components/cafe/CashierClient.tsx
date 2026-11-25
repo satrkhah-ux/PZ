@@ -199,6 +199,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
             table: sale.table,
             note: sale.note,
             printedTotal: sale.total,
+            rangAt: sale.at,
           });
           if (res.ok) dropSale(sale.uid);
           else noteFailure(sale.uid, res.error);

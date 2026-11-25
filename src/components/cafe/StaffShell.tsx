@@ -38,6 +38,7 @@ import type { StaffRole } from "@/lib/cafe/auth";
 import { listPendingOrders } from "@/lib/cafe/cashier-actions";
 import { savePushSubscription, removePushSubscription } from "@/lib/cafe/push-actions";
 import { PizzaraMark } from "./Logo";
+import { WhatsNew } from "./WhatsNew";
 
 /** The build this tab was loaded from, baked in at build time (next.config). */
 const MY_BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
@@ -267,6 +268,7 @@ export function StaffShell({
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <WhatsNew />
       <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
           <div className="flex min-w-0 items-center gap-4">

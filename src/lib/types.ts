@@ -233,7 +233,7 @@ export type Database = {
         Returns: { order_id: string; order_seq: number }[];
       };
       place_order_idem: {
-        Args: { p_client_uid: string; p_channel: OrderChannel; p_lines: Json; p_customer?: string | null; p_table?: string | null; p_note?: string | null };
+        Args: { p_client_uid: string; p_channel: OrderChannel; p_lines: Json; p_customer?: string | null; p_table?: string | null; p_note?: string | null; p_rang_at?: string | null };
         Returns: { order_id: string; order_seq: number; already: boolean }[];
       };
       mark_order_paid: {
