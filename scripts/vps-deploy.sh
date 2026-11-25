@@ -24,9 +24,14 @@ docker build -q --build-arg COMMIT_REF="$NEW" --build-arg NEXT_PUBLIC_SUPABASE_U
   -t "pizzara:$NEW" -t pizzara:latest . >/dev/null
 
 H="pizzara.187.124.112.104.sslip.io"
-STAGING="pizzara-new"
 PROBE="pizzara-probe"
+# Two fixed names, alternating. The previous version renamed the new container
+# into place, and that rename is a Docker event Traefik reads as "gone, then
+# back" — one request failed at exactly that moment in testing. Alternating
+# means the live container is never renamed, only started and stopped.
+if docker inspect pizzara >/dev/null 2>&1; then LIVE="pizzara"; STAGING="pizzara-b"; else LIVE="pizzara-b"; STAGING="pizzara"; fi
 docker rm -f "$STAGING" "$PROBE" >/dev/null 2>&1 || true
+echo "$(date -Is) live=$LIVE -> staging=$STAGING"
 
 # Prove the image serves BEFORE it is reachable from the street. Started with
 # traefik.enable=false, so a broken build is discovered by us and never by a
@@ -78,9 +83,8 @@ if [ -z "$UP" ]; then
   exit 1
 fi
 
-# The new one is already taking traffic, so removing the old leaves no gap;
-# the rename afterwards does not stop anything.
-docker rm -f pizzara >/dev/null 2>&1 || true
-docker rename "$STAGING" pizzara
+# The new one is already taking traffic, so removing the old leaves no gap —
+# and there is no rename to make Traefik blink.
+docker rm -f "$LIVE" >/dev/null 2>&1 || true
 docker image prune -f >/dev/null 2>&1 || true
 echo "$(date -Is) deployed $NEW"
