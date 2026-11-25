@@ -60,6 +60,11 @@ function cartReducer(state: Cart, action: CartAction): Cart {
   }
 }
 
+/** How long the till waits for the server before it holds the sale instead.
+ *  Long enough for a slow-but-alive link, short enough that a queue of
+ *  customers does not watch the screen think. */
+const CHECKOUT_TIMEOUT_MS = 7000;
+
 export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tables: string[] }) {
   const [activeCat, setActiveCat] = useState(menu[0]?.name_ar ?? "");
   const [cart, dispatch] = useReducer(cartReducer, {});
@@ -193,6 +198,7 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
             extraNote: sale.extraNote,
             table: sale.table,
             note: sale.note,
+            printedTotal: sale.total,
           });
           if (res.ok) dropSale(sale.uid);
           else noteFailure(sale.uid, res.error);
@@ -248,13 +254,26 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       const table = orderType === "dinein" ? tableNo : null;
       const extraNote = extras.map((x) => `${x.name} (${formatIqdLabel(x.price)})`).join("، ") || null;
       const payload = lines.map((l) => ({ item_id: l.itemId, variant_id: l.variantId, flavor: l.flavor, qty: l.qty }));
-      // The line is already known to be down — do not make the cashier wait for
-      // a timeout on every sale during an outage.
+      // The uid is minted HERE, before the first attempt, and the same one is
+      // reused if this sale ends up being held and replayed — that is what lets
+      // us stop waiting without risking a double sale.
+      const uid = newUid();
+
+      // navigator.onLine is only a hint: the usual outage here is the ISP
+      // dropping while the router stays up, and the browser cheerfully reports
+      // "online" throughout. What decides is whether the request answers.
       const offline = typeof navigator !== "undefined" && navigator.onLine === false;
       let res: Awaited<ReturnType<typeof cashierCheckout>> | null = null;
       if (!offline) {
         try {
-          res = await cashierCheckout({ lines: payload, discount: appliedDiscount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null });
+          // A dead line makes a server action hang rather than fail, which froze
+          // the till on «جار التنفيذ» until the tab was killed. Stop waiting
+          // after CHECKOUT_TIMEOUT_MS and hold the sale instead; if the request
+          // lands late, its uid makes the replay a no-op.
+          res = await Promise.race([
+            cashierCheckout({ lines: payload, discount: appliedDiscount, extra: extraTotal, extraNote, customerId: customer?.id ?? null, table, note: orderNote.trim() || null, clientUid: uid }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), CHECKOUT_TIMEOUT_MS)),
+          ]);
         } catch {
           res = null; // the request never completed — fall through and hold it
         }
@@ -263,7 +282,6 @@ export function CashierClient({ menu, tables }: { menu: MenuCategoryView[]; tabl
       if (!res) {
         // Hold the sale, print it, serve the customer. The receipt carries «م-N»
         // so staff can see at a glance which tickets are not yet in the system.
-        const uid = newUid();
         const localNo = nextLocalNo();
         const stored = queueSale({
           uid,

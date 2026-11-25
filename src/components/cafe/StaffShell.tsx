@@ -215,7 +215,14 @@ export function StaffShell({
   // Web Push: notifications that reach the device even with the app closed.
   const [pushState, setPushState] = useState<"unsupported" | "off" | "on" | "denied">("unsupported");
   useEffect(() => {
-    if (!pushKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (!("serviceWorker" in navigator)) return;
+    // Register even when push is not configured: the same worker is what keeps
+    // the cashier page openable while the line is down, and that must not hinge
+    // on a VAPID key being present.
+    if (!pushKey || !("PushManager" in window)) {
+      void navigator.serviceWorker.register("/sw.js").catch(() => {});
+      return;
+    }
     navigator.serviceWorker
       .register("/sw.js")
       .then(async (reg) => {

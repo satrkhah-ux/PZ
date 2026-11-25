@@ -111,18 +111,29 @@ export async function cashierCheckout(input: {
   customerId?: string | null;
   table?: string | null;
   note?: string | null;
+  /** Identity of the SALE, minted by the till before it ever calls.
+   *
+   *  Every sale carries one, online or offline, and that is what makes the
+   *  till's timeout safe: when the line is slow the till stops waiting and
+   *  holds the sale, but this request may still land afterwards. Because the
+   *  uid came first, the later replay recognises its own sale instead of
+   *  booking a second one. */
+  clientUid: string;
 }): Promise<CheckoutResult> {
   await requireStaff();
   if (!input.lines?.length) return { ok: false, error: "لا توجد أصناف في الطلب." };
+  if (!input.clientUid) return { ok: false, error: "بصمة الطلب مفقودة." };
 
   const supabase = await createSupabaseServerClient();
-  const { data: placed, error } = await supabase.rpc("place_order", {
+  const { data: idem, error } = await supabase.rpc("place_order_idem", {
+    p_client_uid: input.clientUid,
     p_channel: "cashier",
     p_lines: input.lines as unknown as Json,
     p_customer: input.customerId ?? null,
     p_table: input.table?.trim() || null,
     p_note: input.note?.trim() || null,
   });
+  const placed = idem as { order_id: string; order_seq: number; already: boolean }[] | null;
   if (error || !placed?.[0]) return { ok: false, error: error?.message ?? "تعذّر إنشاء الطلب." };
 
   const paid = await payOrder(supabase, placed[0].order_id, input.discount ?? 0, input.customerId ?? null, input.extra ?? 0, input.extraNote ?? null);
@@ -167,6 +178,8 @@ export async function syncOfflineSale(sale: {
   extraNote?: string | null;
   table?: string | null;
   note?: string | null;
+  /** what the paper receipt actually said — the customer already paid this */
+  printedTotal?: number;
 }): Promise<{ ok: true; orderNumber: string; already: boolean } | { ok: false; error: string }> {
   await requireStaff();
   if (!sale.uid) return { ok: false, error: "بصمة الطلب مفقودة." };
@@ -199,7 +212,29 @@ export async function syncOfflineSale(sale: {
   // that attempt died between the two steps, so settle it rather than assume.
   if (row.already && ord?.status !== "pending") return { ok: true, orderNumber: code, already: true };
 
-  const paid = await payOrder(supabase, row.order_id, sale.discount ?? 0, null, sale.extra ?? 0, sale.extraNote ?? null);
+  // place_order prices the lines from the LIVE menu at replay time. If a price
+  // was edited during the outage, the order's subtotal no longer matches the
+  // paper the customer paid against. The receipt is the truth — the money is
+  // already in the drawer — so absorb the difference into discount/extra, which
+  // is exactly how the project's own formula (subtotal − discount + extra)
+  // records a paid amount.
+  let discount = Math.max(0, Math.round(sale.discount ?? 0));
+  let extra = Math.max(0, Math.round(sale.extra ?? 0));
+  let extraNote = sale.extraNote ?? null;
+  if (typeof sale.printedTotal === "number" && sale.printedTotal >= 0) {
+    const { data: fresh } = await supabase.from("orders").select("subtotal").eq("id", row.order_id).maybeSingle();
+    const subtotal = fresh?.subtotal ?? 0;
+    const wouldRecord = subtotal - discount + extra;
+    const drift = sale.printedTotal - wouldRecord;
+    if (drift > 0) extra += drift;
+    else if (drift < 0) discount += -drift;
+    if (drift !== 0) {
+      const mark = `تسعيرة تغيّرت أثناء الانقطاع (${drift > 0 ? "+" : ""}${drift})`;
+      extraNote = extraNote ? `${extraNote} — ${mark}` : mark;
+    }
+  }
+
+  const paid = await payOrder(supabase, row.order_id, discount, null, extra, extraNote);
   if (!paid.ok) return paid;
 
   revalidatePath("/cashier");
