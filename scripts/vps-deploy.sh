@@ -25,7 +25,26 @@ docker build -q --build-arg COMMIT_REF="$NEW" --build-arg NEXT_PUBLIC_SUPABASE_U
 
 H="pizzara.187.124.112.104.sslip.io"
 STAGING="pizzara-new"
-docker rm -f "$STAGING" >/dev/null 2>&1 || true
+PROBE="pizzara-probe"
+docker rm -f "$STAGING" "$PROBE" >/dev/null 2>&1 || true
+
+# Prove the image serves BEFORE it is reachable from the street. Started with
+# traefik.enable=false, so a broken build is discovered by us and never by a
+# customer; labels cannot be added to a running container, hence the two steps.
+docker run -d --name "$PROBE" --network coolify --label traefik.enable=false   --env-file "$HOME/apps/pizzara/.env" "pizzara:$NEW" >/dev/null
+PROBE_OK=""
+for _ in $(seq 1 40); do
+  if docker exec "$PROBE" wget -qO- -T 2 http://127.0.0.1:3000/menu >/dev/null 2>&1; then PROBE_OK=1; break; fi
+  sleep 1
+done
+if [ -z "$PROBE_OK" ]; then
+  echo "$(date -Is) NEW BUILD DID NOT ANSWER — keeping $OLD live, nothing was exposed"
+  docker logs --tail 20 "$PROBE" 2>&1 | sed "s/^/    /"
+  docker rm -f "$PROBE" >/dev/null 2>&1 || true
+  git reset --quiet --hard "$OLD"
+  exit 1
+fi
+docker rm -f "$PROBE" >/dev/null 2>&1 || true
 
 # Same labels as the live one: while both run, Traefik simply has two servers
 # for one service, which is exactly the overlap we want.
@@ -45,9 +64,9 @@ docker run -d --name "$STAGING" --restart unless-stopped --network coolify \
   --label "traefik.http.services.pizzara-svc.loadbalancer.server.port=3000" \
   "pizzara:$NEW" >/dev/null
 
-# Prove it serves before trusting it with customers.
+# Already proven above; this only waits for THIS container to boot.
 UP=""
-for _ in $(seq 1 40); do
+for _ in $(seq 1 30); do
   if docker exec "$STAGING" wget -qO- -T 2 http://127.0.0.1:3000/menu >/dev/null 2>&1; then UP=1; break; fi
   sleep 1
 done
