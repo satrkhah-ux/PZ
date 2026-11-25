@@ -189,15 +189,26 @@ export async function syncOfflineSale(sale: {
   if (!sale.lines?.length) return { ok: false, error: "طلب بلا أصناف." };
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("place_order_idem", {
+  const args = {
     p_client_uid: sale.uid,
-    p_channel: "cashier",
+    p_channel: "cashier" as const,
     p_lines: sale.lines as unknown as Json,
     p_customer: null,
     p_table: sale.table?.trim() || null,
     p_note: sale.note?.trim() || null,
+  };
+  let { data, error } = await supabase.rpc("place_order_idem", {
+    ...args,
     p_rang_at: sale.rangAt ? new Date(sale.rangAt).toISOString() : null,
   });
+  // 0022 adds p_rang_at (so a sale across midnight keeps its own day). If that
+  // migration has not been applied yet, PostgREST cannot find a function with
+  // this signature — fall back rather than strand the sale on the till. The
+  // sale then lands on the day it SYNCED, which is the old behaviour, not a
+  // loss, and the deploy order stops being load-bearing.
+  if (error && /PGRST202|p_rang_at|does not exist|Could not find/i.test(`${error.code ?? ""} ${error.message}`)) {
+    ({ data, error } = await supabase.rpc("place_order_idem", args));
+  }
   if (error) return { ok: false, error: error.message };
   const row = data?.[0];
   if (!row) return { ok: false, error: "تعذّر تسجيل الطلب." };
