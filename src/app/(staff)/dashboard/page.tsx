@@ -30,7 +30,10 @@ export default async function DashboardPage({
   let todayReset: DaySummary | null = null;
   let outstandingDebts = 0;
   const today = businessDay();
-  const yesterday = businessDay(new Date(Date.now() - 86_400_000));
+  // lastNDays(2) is [yesterday, today] in Baghdad time — the same instant the
+  // old `Date.now() - 86_400_000` produced, but read through the one helper that
+  // owns the clock instead of during render.
+  const [yesterday] = lastNDays(2);
   let yesterdaySummary: DaySummary | null = null;
   try {
     const [from, to] = lastNDays(days);

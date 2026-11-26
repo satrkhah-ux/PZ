@@ -13,7 +13,12 @@ import { useEffect, useRef } from "react";
  */
 export function usePoll(fn: () => void | Promise<void>, everyMs: number) {
   const saved = useRef(fn);
-  saved.current = fn;
+  // Kept fresh in an effect, not during render: the timer below reads
+  // saved.current at fire time, so writing it after each commit is just as
+  // current and does not touch a ref while rendering.
+  useEffect(() => {
+    saved.current = fn;
+  });
 
   useEffect(() => {
     let timer: number | undefined;

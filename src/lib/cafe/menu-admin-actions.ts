@@ -5,7 +5,17 @@ import sharp from "sharp";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { requireAdmin } from "./auth";
 
-export type AdminVariant = { id: string; name_ar: string; price_override: number | null; kind: string; sort: number };
+export type AdminVariant = {
+  id: string;
+  name_ar: string;
+  price_override: number | null;
+  /** null = this size costs whatever the item costs. place_order resolves it as
+   *  coalesce(cost_override, item.cost), so a size priced 6000 against a 3500
+   *  base is otherwise booked at the base cost and reads as pure profit. */
+  cost_override: number | null;
+  kind: string;
+  sort: number;
+};
 export type AdminItem = {
   id: string;
   category_id: string;
@@ -35,13 +45,20 @@ export async function listMenuAdmin(): Promise<AdminCategory[]> {
   const [{ data: cats }, { data: items }, { data: vars }] = await Promise.all([
     svc.from("categories").select("id, name_ar, sort, is_active").order("sort"),
     svc.from("menu_items").select("id, category_id, name_ar, description_ar, image_url, price, cost, flavors, is_active, sort").order("sort"),
-    svc.from("item_variants").select("id, item_id, name_ar, price_override, kind, sort").order("sort"),
+    svc.from("item_variants").select("id, item_id, name_ar, price_override, cost_override, kind, sort").order("sort"),
   ]);
 
   const varsByItem = new Map<string, AdminVariant[]>();
   for (const v of vars ?? []) {
     const arr = varsByItem.get(v.item_id) ?? [];
-    arr.push({ id: v.id, name_ar: v.name_ar, price_override: v.price_override, kind: v.kind, sort: v.sort });
+    arr.push({
+      id: v.id,
+      name_ar: v.name_ar,
+      price_override: v.price_override,
+      cost_override: v.cost_override,
+      kind: v.kind,
+      sort: v.sort,
+    });
     varsByItem.set(v.item_id, arr);
   }
   const itemsByCat = new Map<string, AdminItem[]>();
@@ -95,6 +112,51 @@ export async function upsertItem(input: ItemInput) {
   if (error) return { ok: false as const, error: error.message };
   revalidateMenu();
   return { ok: true as const };
+}
+
+/** Bulk cost entry — the only writer that touches `cost` and nothing else.
+ *
+ *  Deliberately NOT routed through upsertItem: that rebuilds the whole row from
+ *  its input, so a costs screen calling it would also rewrite names, prices,
+ *  flavors and is_active from whatever it happened to be holding. Here an item
+ *  update carries one column and a variant update carries one column.
+ *
+ *  53 single-column updates in parallel rather than one RPC: the alternative is
+ *  new SQL on a live database that has already drifted ahead of its migrations,
+ *  for a screen whose whole job is a one-off data-entry session. */
+export async function saveItemCosts(input: {
+  items?: { id: string; cost: number }[];
+  variants?: { id: string; cost: number }[];
+}): Promise<{ ok: true; saved: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const items = input.items ?? [];
+  const variants = input.variants ?? [];
+  if (!items.length && !variants.length) return { ok: false, error: "لا توجد تغييرات لحفظها." };
+
+  const svc = createSupabaseServiceClient();
+  const results = await Promise.all([
+    ...items.map(async (r) => ({
+      what: r.id,
+      error: (await svc.from("menu_items").update({ cost: Math.max(0, Math.round(r.cost)) }).eq("id", r.id)).error,
+    })),
+    ...variants.map(async (r) => ({
+      what: r.id,
+      error: (await svc.from("item_variants").update({ cost_override: Math.max(0, Math.round(r.cost)) }).eq("id", r.id)).error,
+    })),
+  ]);
+
+  const failed = results.filter((r) => r.error);
+  // Partial success is reported as failure on purpose: the owner is entering a
+  // costing they will then read profit from, so "most of it saved" is the one
+  // outcome they must not mistake for success.
+  if (failed.length) {
+    return { ok: false, error: `تعذّر حفظ ${failed.length} من ${results.length}: ${failed[0].error?.message ?? ""}` };
+  }
+  revalidateMenu();
+  revalidatePath("/costs");
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
+  return { ok: true, saved: results.length };
 }
 
 export async function toggleItem(id: string, is_active: boolean) {

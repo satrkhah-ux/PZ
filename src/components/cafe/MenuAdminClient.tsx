@@ -232,7 +232,12 @@ function ItemForm({ editing, categories, onClose }: { editing: Editing; categori
       setMsg(res.error);
       return;
     }
-    setVariants([...variants, { id: `tmp-${vName}-${p}`, name_ar: vName, price_override: p, kind: "size", sort: variants.length }]);
+    setVariants([
+      ...variants,
+      // cost_override null = inherits the item's cost, which is what the DB just
+      // stored; its own cost is set on «كلف الأصناف».
+      { id: `tmp-${vName}-${p}`, name_ar: vName, price_override: p, cost_override: null, kind: "size", sort: variants.length },
+    ]);
     setVName("");
     setVPrice("");
   }
